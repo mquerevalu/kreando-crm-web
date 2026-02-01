@@ -56,39 +56,38 @@ const ConversationsPage: React.FC = () => {
 
   // Manejar mensajes WebSocket
   const handleWebSocketMessage = useCallback((wsMessage: any) => {
-    // Solo procesar mensajes si hay una conversación seleccionada
-    if (!selectedConversationRef.current) {
-      console.warn('No conversation selected, ignoring WebSocket message');
-      return;
-    }
-
     if (wsMessage.type === 'message') {
-      // Verificar que el mensaje sea para la conversación actual
-      if (wsMessage.senderId !== selectedConversationRef.current.senderId) {
-        console.warn(`Message is for senderId ${wsMessage.senderId}, but current conversation is ${selectedConversationRef.current.senderId}, ignoring`);
-        return;
+      // Solo agregar el mensaje a la vista si es para la conversación actual
+      if (selectedConversationRef.current && wsMessage.senderId === selectedConversationRef.current.senderId) {
+        const newMessage: Message = {
+          id: `ws-${Date.now()}`,
+          sender: wsMessage.data.direction === 'incoming' ? (wsMessage.data.senderName || 'Usuario') : 'Bot',
+          content: wsMessage.data.message,
+          timestamp: new Date(wsMessage.data.timestamp).toISOString(),
+          direction: wsMessage.data.direction === 'incoming' ? 'inbound' : 'outbound',
+        };
+        setMessages(prev => [...prev, newMessage]);
       }
-
-      // Nuevo mensaje recibido
-      const newMessage: Message = {
-        id: `ws-${Date.now()}`,
-        sender: wsMessage.data.direction === 'incoming' ? (wsMessage.data.senderName || 'Usuario') : 'Bot',
-        content: wsMessage.data.message,
-        timestamp: new Date(wsMessage.data.timestamp).toISOString(),
-        direction: wsMessage.data.direction === 'incoming' ? 'inbound' : 'outbound',
-      };
-      setMessages(prev => [...prev, newMessage]);
     } else if (wsMessage.type === 'conversation_update') {
-      // Actualizar conversación (esto sí puede ser para cualquier conversación)
-      setConversations(prev =>
-        prev.map(conv =>
+      // Actualizar conversación en la lista
+      setConversations(prev => {
+        const updated = prev.map(conv =>
           conv.senderId === wsMessage.senderId
-            ? { ...conv, lastMessage: wsMessage.data.lastMessage }
+            ? { ...conv, lastMessage: wsMessage.data.lastMessage, lastMessageTime: new Date(wsMessage.data.updatedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) }
             : conv
-        )
-      );
+        );
+        
+        // Si la conversación no existe en la lista, recargar todas las conversaciones
+        const conversationExists = updated.some(conv => conv.senderId === wsMessage.senderId);
+        if (!conversationExists) {
+          console.log(`New conversation detected for senderId: ${wsMessage.senderId}, reloading conversations`);
+          loadConversations();
+        }
+        
+        return updated;
+      });
     }
-  }, []);
+  }, [loadConversations]);
 
   // Conectar WebSocket con el senderId de la conversación seleccionada
   useWebSocket(pageId, selectedConversation?.senderId, handleWebSocketMessage);
