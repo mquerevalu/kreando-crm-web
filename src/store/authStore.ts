@@ -1,12 +1,13 @@
 import { create } from 'zustand';
-import { User } from '../types/index';
-import { authService } from '../services/authService';
+import { cognitoService, CognitoUser } from '../services/cognitoService';
 
 interface AuthStore {
-  user: User | null;
+  user: CognitoUser | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isCheckingAuth: boolean;
   error: string | null;
   
   login: (email: string, password: string) => Promise<void>;
@@ -18,25 +19,31 @@ interface AuthStore {
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   token: null,
+  refreshToken: null,
   isAuthenticated: false,
   isLoading: false,
+  isCheckingAuth: true,
   error: null,
 
   login: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await authService.login(email, password);
+      const response = await cognitoService.login(email, password);
       localStorage.setItem('token', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
+      if (response.refreshToken) {
+        localStorage.setItem('refreshToken', response.refreshToken);
+      }
       
       set({
         user: response.user,
         token: response.token,
+        refreshToken: response.refreshToken || null,
         isAuthenticated: true,
         isLoading: false,
       });
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Error al iniciar sesión';
+      const errorMessage = error.message || 'Error al iniciar sesión';
       set({
         error: errorMessage,
         isLoading: false,
@@ -46,11 +53,11 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    cognitoService.logout();
     set({
       user: null,
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
       error: null,
     });
@@ -59,6 +66,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   checkAuth: () => {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
+    const refreshToken = localStorage.getItem('refreshToken');
     
     if (token && userStr) {
       try {
@@ -66,12 +74,18 @@ export const useAuthStore = create<AuthStore>((set) => ({
         set({
           user,
           token,
+          refreshToken,
           isAuthenticated: true,
+          isCheckingAuth: false,
         });
       } catch (error) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('refreshToken');
+        set({ isCheckingAuth: false });
       }
+    } else {
+      set({ isCheckingAuth: false });
     }
   },
 

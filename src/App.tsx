@@ -10,11 +10,25 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 
 function App() {
-  const { isAuthenticated, checkAuth } = useAuthStore();
+  const { isAuthenticated, isCheckingAuth, checkAuth } = useAuthStore();
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Mostrar pantalla de carga mientras se verifica la autenticación
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-lg mx-auto mb-4">
+            K
+          </div>
+          <p className="text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Router>
