@@ -310,15 +310,28 @@ const ConversationsPage: React.FC = () => {
           <>
             {/* Chat Header */}
             <div className="bg-white border-b border-gray-200 p-6 flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-1">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold">
                   {(selectedConversation.participantName || selectedConversation.phoneNumber).charAt(0).toUpperCase()}
                 </div>
-                <div>
+                <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    {selectedConversation.participantName || selectedConversation.phoneNumber}
+                    {selectedConversation.participantName || 'Usuario'}
                   </h3>
-                  <p className="text-xs text-gray-500">En línea</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-gray-500">En línea</p>
+                    <span className="text-xs text-gray-400">•</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedConversation.phoneNumber);
+                        alert('Número copiado: ' + selectedConversation.phoneNumber);
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 hover:underline transition font-mono"
+                      title="Haz clic para copiar"
+                    >
+                      {selectedConversation.phoneNumber}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="flex gap-2">
