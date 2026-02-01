@@ -27,7 +27,7 @@ const WorkflowNode: React.FC<WorkflowNodeProps> = ({ data }) => {
   return (
     <div
       onClick={data.onClick}
-      className="relative w-full h-full flex flex-col items-center justify-center p-2 cursor-pointer hover:shadow-lg transition"
+      className="relative w-full h-full flex flex-col items-center justify-center p-2 cursor-pointer hover:shadow-lg transition group"
     >
       <Handle type="target" position={Position.Top} />
       
@@ -47,12 +47,16 @@ const WorkflowNode: React.FC<WorkflowNodeProps> = ({ data }) => {
         </div>
       )}
 
+      {/* Delete Button - More Visible */}
       <button
         onClick={(e) => {
           e.stopPropagation();
-          data.onDelete();
+          if (window.confirm('¿Estás seguro de que deseas eliminar este paso?')) {
+            data.onDelete();
+          }
         }}
-        className="absolute top-1 left-1 text-xs bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center hover:bg-red-700 transition"
+        className="absolute top-1 left-1 text-xs bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center hover:bg-red-700 transition opacity-0 group-hover:opacity-100"
+        title="Eliminar paso"
       >
         ✕
       </button>

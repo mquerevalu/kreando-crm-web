@@ -28,6 +28,7 @@ export interface Company {
   urlWebHook: string;
   fechaCreacion: number;
   fechaActualizacion: number;
+  flujoBot?: any[];
 }
 
 const logApiCall = (method: string, endpoint: string, data?: any) => {
