@@ -114,3 +114,4 @@ export const bucketName = bucket.id;
 export const bucketArn = bucket.arn;
 export const distributionDomainName = distribution.domainName;
 export const distributionId = distribution.id;
+

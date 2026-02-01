@@ -233,18 +233,13 @@ const ConversationsPage: React.FC = () => {
         fileType = 'audio';
       }
 
-      // En producción, necesitarías subir el archivo a S3 o similar
-      // Por ahora, usamos una URL de ejemplo
-      const fileUrl = URL.createObjectURL(file);
-      
       console.log(`Sending ${fileType}: ${file.name}`);
       
-      await conversationService.sendFile(
+      await conversationService.sendFileBlob(
         selectedConversation.pageId,
         selectedConversation.senderId,
-        fileUrl,
+        file,
         fileType,
-        file.name,
         replyMessage || undefined
       );
 

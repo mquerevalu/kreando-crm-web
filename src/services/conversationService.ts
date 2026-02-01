@@ -226,6 +226,30 @@ export const conversationService = {
     }
   },
 
+  sendFileBlob: async (pageId: string, senderId: string, file: File, fileType: string, caption?: string): Promise<Message> => {
+    logApiCall('POST', `/conversations/messages?pageId=${pageId}&senderId=${senderId}`, { fileName: file.name, fileType, caption });
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileType', fileType);
+      if (caption) {
+        formData.append('caption', caption);
+      }
+
+      const response = await apiClient.post('/conversations/messages', formData, {
+        params: { pageId, senderId },
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      logApiResponse('POST', `/conversations/messages`, response.data);
+      return response.data;
+    } catch (error) {
+      console.warn('API error:', error);
+      throw error;
+    }
+  },
+
   archiveConversation: async (pageId: string, senderId: string): Promise<void> => {
     logApiCall('PUT', `/conversations/archive?pageId=${pageId}&senderId=${senderId}`);
     try {
