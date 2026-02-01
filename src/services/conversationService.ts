@@ -169,14 +169,16 @@ export const conversationService = {
     }
   },
 
-  getMessages: async (pageId: string, senderId: string): Promise<Message[]> => {
-    logApiCall('GET', `/conversations/messages?pageId=${pageId}&senderId=${senderId}`);
+  getMessages: async (pageId: string, senderId: string, limit: number = 200): Promise<Message[]> => {
+    logApiCall('GET', `/conversations/messages?pageId=${pageId}&senderId=${senderId}&limit=${limit}`);
     try {
       const response = await apiClient.get('/conversations/messages', {
-        params: { pageId, senderId },
+        params: { pageId, senderId, limit },
       });
       logApiResponse('GET', `/conversations/messages`, response.data);
-      return response.data;
+      // Si la respuesta tiene un objeto con 'messages', extraer solo los mensajes
+      const messages = Array.isArray(response.data) ? response.data : response.data.messages || [];
+      return messages;
     } catch (error) {
       console.warn('API error, using mock data:', error);
       await new Promise(resolve => setTimeout(resolve, 300));

@@ -56,7 +56,19 @@ const ConversationsPage: React.FC = () => {
 
   // Manejar mensajes WebSocket
   const handleWebSocketMessage = useCallback((wsMessage: any) => {
+    // Solo procesar mensajes si hay una conversación seleccionada
+    if (!selectedConversationRef.current) {
+      console.warn('No conversation selected, ignoring WebSocket message');
+      return;
+    }
+
     if (wsMessage.type === 'message') {
+      // Verificar que el mensaje sea para la conversación actual
+      if (wsMessage.senderId !== selectedConversationRef.current.senderId) {
+        console.warn(`Message is for senderId ${wsMessage.senderId}, but current conversation is ${selectedConversationRef.current.senderId}, ignoring`);
+        return;
+      }
+
       // Nuevo mensaje recibido
       const newMessage: Message = {
         id: `ws-${Date.now()}`,
@@ -67,7 +79,7 @@ const ConversationsPage: React.FC = () => {
       };
       setMessages(prev => [...prev, newMessage]);
     } else if (wsMessage.type === 'conversation_update') {
-      // Actualizar conversación
+      // Actualizar conversación (esto sí puede ser para cualquier conversación)
       setConversations(prev =>
         prev.map(conv =>
           conv.senderId === wsMessage.senderId
