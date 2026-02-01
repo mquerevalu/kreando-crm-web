@@ -236,11 +236,10 @@ export const conversationService = {
         formData.append('caption', caption);
       }
 
+      // Don't set Content-Type header - let axios/browser handle it automatically
+      // This ensures proper multipart/form-data encoding with correct binary handling
       const response = await apiClient.post('/conversations/messages', formData, {
         params: { pageId, senderId },
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
       });
       logApiResponse('POST', `/conversations/messages`, response.data);
       return response.data;
