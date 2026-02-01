@@ -32,6 +32,9 @@ const ConversationsPage: React.FC = () => {
   const [replyMessage, setReplyMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showWebhookModal, setShowWebhookModal] = useState(false);
+  const [webhookData, setWebhookData] = useState<any>(null);
+  const [contactSource, setContactSource] = useState('WhatsApp');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedConversationRef = useRef<Conversation | null>(null);
@@ -220,6 +223,66 @@ const ConversationsPage: React.FC = () => {
       (conv.participantName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
 
+  // Extraer preguntas y respuestas del flujo
+  const extractQuestionsAndAnswers = () => {
+    const questionsAnswers: Array<{ question: string; answer: string }> = [];
+    
+    // Buscar patrones de pregunta-respuesta en los mensajes
+    for (let i = 0; i < messages.length - 1; i++) {
+      const currentMsg = messages[i];
+      const nextMsg = messages[i + 1];
+      
+      // Si el mensaje actual es del bot (outbound) y el siguiente es del usuario (inbound)
+      if (currentMsg.direction === 'outbound' && nextMsg.direction === 'inbound') {
+        // Verificar que sea una pregunta (termina con ?)
+        if (currentMsg.content.includes('?')) {
+          questionsAnswers.push({
+            question: currentMsg.content,
+            answer: nextMsg.content,
+          });
+        }
+      }
+    }
+    
+    return questionsAnswers;
+  };
+
+  const handleOpenWebhookModal = () => {
+    if (!selectedCompany?.urlWebHook) {
+      alert('La empresa no tiene configurado un webhook');
+      return;
+    }
+
+    const questionsAnswers = extractQuestionsAndAnswers();
+    const dataToSend = {
+      phoneNumber: selectedConversation?.phoneNumber,
+      participantName: selectedConversation?.participantName || 'Sin nombre',
+      questionsAnswers: questionsAnswers,
+      contactSource: contactSource,
+      timestamp: new Date().toISOString(),
+    };
+
+    setWebhookData(dataToSend);
+    setShowWebhookModal(true);
+  };
+
+  const handleSendToWebhook = async () => {
+    if (!webhookData || !selectedCompany?.urlWebHook) return;
+
+    try {
+      setLoading(true);
+      await conversationService.sendToWebhook(selectedCompany.urlWebHook, webhookData);
+      alert('Datos enviados al webhook correctamente');
+      setShowWebhookModal(false);
+      setWebhookData(null);
+    } catch (error) {
+      console.error('Error sending to webhook:', error);
+      alert('Error al enviar datos al webhook');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex h-full bg-gray-50">
       {/* Conversations List - WhatsApp Style */}
@@ -335,6 +398,14 @@ const ConversationsPage: React.FC = () => {
                 </div>
               </div>
               <div className="flex gap-2">
+                <button 
+                  onClick={handleOpenWebhookModal}
+                  disabled={loading || !selectedCompany?.urlWebHook}
+                  className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Enviar a webhook"
+                >
+                  🔗
+                </button>
                 <button className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600">
                   🔍
                 </button>
@@ -436,6 +507,98 @@ const ConversationsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Webhook Modal */}
+      {showWebhookModal && webhookData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
+              <h2 className="text-xl font-bold">Validar datos para enviar</h2>
+              <p className="text-blue-100 text-sm mt-1">Revisa los datos antes de enviar al webhook</p>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              {/* Nombre */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre</label>
+                <input
+                  type="text"
+                  value={webhookData.participantName}
+                  onChange={(e) => setWebhookData({ ...webhookData, participantName: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
+              {/* Teléfono */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Teléfono</label>
+                <input
+                  type="text"
+                  value={webhookData.phoneNumber}
+                  onChange={(e) => setWebhookData({ ...webhookData, phoneNumber: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                />
+              </div>
+
+              {/* Fuente de Contacto */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Fuente de Contacto</label>
+                <select
+                  value={webhookData.contactSource}
+                  onChange={(e) => setWebhookData({ ...webhookData, contactSource: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="WhatsApp">WhatsApp</option>
+                  <option value="TikTok">TikTok</option>
+                  <option value="Instagram">Instagram</option>
+                  <option value="Facebook">Facebook</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+
+              {/* Preguntas y Respuestas */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Preguntas Respondidas</label>
+                <div className="bg-gray-50 rounded-lg p-3 max-h-48 overflow-y-auto space-y-3">
+                  {webhookData.questionsAnswers.length === 0 ? (
+                    <p className="text-sm text-gray-500">No hay preguntas respondidas</p>
+                  ) : (
+                    webhookData.questionsAnswers.map((qa: any, idx: number) => (
+                      <div key={idx} className="bg-white p-2 rounded border border-gray-200">
+                        <p className="text-xs font-semibold text-gray-700">P: {qa.question}</p>
+                        <p className="text-xs text-gray-600 mt-1">R: {qa.answer}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="border-t border-gray-200 p-6 flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowWebhookModal(false);
+                  setWebhookData(null);
+                }}
+                disabled={loading}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSendToWebhook}
+                disabled={loading}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold hover:shadow-lg transition disabled:opacity-50"
+              >
+                {loading ? 'Enviando...' : 'Enviar al Webhook'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -250,4 +250,16 @@ export const conversationService = {
       console.warn('API error:', error);
     }
   },
+
+  sendToWebhook: async (webhookUrl: string, conversationData: any): Promise<any> => {
+    logApiCall('POST', webhookUrl, conversationData);
+    try {
+      const response = await axios.post(webhookUrl, conversationData);
+      logApiResponse('POST', webhookUrl, response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Webhook error:', error);
+      throw error;
+    }
+  },
 };
