@@ -133,10 +133,11 @@ const CompaniesPage: React.FC = () => {
   return (
     <div className="flex h-full bg-gray-100">
       {/* Companies List */}
-      <div className="w-80 bg-white flex flex-col border-r border-gray-200">
+      <div className="w-80 bg-white flex flex-col border-r border-gray-200 shadow-sm">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
-          <h1 className="text-2xl font-bold">Empresas</h1>
+        <div className="bg-gradient-to-b from-slate-900 to-slate-800 text-white p-6">
+          <h1 className="text-2xl font-bold">🏢 Empresas</h1>
+          <p className="text-slate-300 text-sm mt-1">Gestión de empresas</p>
         </div>
 
         {/* Companies List */}
@@ -180,20 +181,20 @@ const CompaniesPage: React.FC = () => {
       </div>
 
       {/* Company Details */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col bg-gray-50">
         {selectedCompany && editingCompany ? (
           <>
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 shadow-sm">
-              <h2 className="text-2xl font-bold">{selectedCompany.nombreEmpresa}</h2>
-              <p className="text-blue-100 text-sm mt-1">ID: {selectedCompany.configId}</p>
+            <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-8 shadow-md">
+              <h2 className="text-3xl font-bold">{selectedCompany.nombreEmpresa}</h2>
+              <p className="text-slate-300 text-sm mt-2">ID: {selectedCompany.configId}</p>
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-gray-200 bg-gray-50">
+            <div className="flex border-b border-gray-200 bg-white shadow-sm">
               <button
                 onClick={() => setActiveTab('info')}
-                className={`px-6 py-3 font-semibold text-sm transition ${
+                className={`px-8 py-4 font-semibold text-sm transition ${
                   activeTab === 'info'
                     ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
                     : 'text-gray-600 hover:text-gray-900'
@@ -203,7 +204,7 @@ const CompaniesPage: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveTab('flow')}
-                className={`px-6 py-3 font-semibold text-sm transition ${
+                className={`px-8 py-4 font-semibold text-sm transition ${
                   activeTab === 'flow'
                     ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
                     : 'text-gray-600 hover:text-gray-900'
@@ -213,7 +214,7 @@ const CompaniesPage: React.FC = () => {
               </button>
               <button
                 onClick={() => setShowFlowModal(true)}
-                className="px-6 py-3 font-semibold text-sm text-blue-600 hover:text-blue-800 transition flex items-center gap-2 ml-auto"
+                className="px-8 py-4 font-semibold text-sm text-blue-600 hover:text-blue-800 transition flex items-center gap-2 ml-auto"
                 title="Abrir editor de flujo en pantalla completa"
               >
                 🖥️ Pantalla Completa
@@ -233,7 +234,7 @@ const CompaniesPage: React.FC = () => {
             )}
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-8 bg-gray-50">
               {activeTab === 'info' ? (
                 <div className="space-y-6">
                   {/* Nombre Empresa */}
@@ -377,18 +378,18 @@ const CompaniesPage: React.FC = () => {
             </div>
 
             {/* Actions */}
-            <div className="border-t border-gray-200 p-6 flex gap-3 justify-end">
+            <div className="border-t border-gray-200 p-8 flex gap-3 justify-end bg-white shadow-md">
               <button
                 onClick={handleCancel}
                 disabled={loading}
-                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition disabled:opacity-50"
+                className="px-8 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSave}
                 disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                className="px-8 py-3 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-lg font-semibold hover:shadow-lg transition disabled:opacity-50"
               >
                 {loading ? 'Guardando...' : 'Guardar Cambios'}
               </button>

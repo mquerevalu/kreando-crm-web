@@ -189,23 +189,24 @@ const ConversationsPage: React.FC = () => {
   );
 
   return (
-    <div className="flex h-full bg-gray-100">
+    <div className="flex h-full bg-gray-50">
       {/* Conversations List - WhatsApp Style */}
-      <div className="w-96 bg-white flex flex-col border-r border-gray-200">
+      <div className="w-96 bg-white flex flex-col border-r border-gray-200 shadow-sm">
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-4">
-          <h1 className="text-2xl font-bold">Mensajes</h1>
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
+          <h1 className="text-2xl font-bold">💬 Mensajes</h1>
+          <p className="text-blue-100 text-sm mt-1">Gestión de conversaciones</p>
         </div>
 
         {/* Search Bar */}
-        <div className="p-3 bg-gray-50 border-b border-gray-200">
+        <div className="p-4 bg-gray-50 border-b border-gray-200">
           <div className="relative">
             <input
               type="text"
               placeholder="🔍 Buscar conversación..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             />
           </div>
         </div>
@@ -225,11 +226,11 @@ const ConversationsPage: React.FC = () => {
                 key={conversation.id}
                 onClick={() => handleSelectConversation(conversation)}
                 className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition flex items-center gap-3 ${
-                  selectedConversation?.id === conversation.id ? 'bg-gray-100' : ''
+                  selectedConversation?.id === conversation.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''
                 }`}
               >
                 {/* Avatar */}
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold flex-shrink-0">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold flex-shrink-0">
                   {(conversation.participantName || conversation.phoneNumber).charAt(0).toUpperCase()}
                 </div>
 
@@ -250,13 +251,13 @@ const ConversationsPage: React.FC = () => {
       </div>
 
       {/* Messages Area - WhatsApp Style */}
-      <div className="flex-1 flex flex-col bg-gradient-to-b from-gray-50 to-white">
+      <div className="flex-1 flex flex-col bg-white">
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between shadow-sm">
+            <div className="bg-white border-b border-gray-200 p-6 flex items-center justify-between shadow-sm">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold">
                   {(selectedConversation.participantName || selectedConversation.phoneNumber).charAt(0).toUpperCase()}
                 </div>
                 <div>
@@ -267,17 +268,17 @@ const ConversationsPage: React.FC = () => {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button className="p-2 hover:bg-gray-100 rounded-full transition">
+                <button className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600">
                   🔍
                 </button>
-                <button className="p-2 hover:bg-gray-100 rounded-full transition">
+                <button className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600">
                   ⋮
                 </button>
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-gray-50 to-white">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-gray-500">
                   <div className="text-center">
@@ -295,14 +296,14 @@ const ConversationsPage: React.FC = () => {
                       <div
                         className={`max-w-xs px-4 py-2 rounded-2xl ${
                           message.direction === 'outbound'
-                            ? 'bg-green-500 text-white rounded-br-none'
-                            : 'bg-white text-gray-900 rounded-bl-none border border-gray-200'
-                        } shadow-sm`}
+                            ? 'bg-blue-600 text-white rounded-br-none shadow-sm'
+                            : 'bg-white text-gray-900 rounded-bl-none border border-gray-200 shadow-sm'
+                        }`}
                       >
                         <p className="text-sm break-words">{message.content}</p>
                         <p className={`text-xs mt-1 ${
                           message.direction === 'outbound'
-                            ? 'text-green-100'
+                            ? 'text-blue-100'
                             : 'text-gray-500'
                         }`}>
                           {new Date(message.timestamp).toLocaleTimeString('es-ES', { 
