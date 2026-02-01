@@ -1,0 +1,5 @@
+name: kreando-agente-web
+runtime: nodejs
+description: Infraestructura para desplegar Kreando Agente Web en S3 y CloudFront
+config:
+  aws:region: us-east-2 # Or wherever you used 'default:' or similar

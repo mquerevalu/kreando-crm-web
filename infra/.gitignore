@@ -1,0 +1,14 @@
+node_modules/
+bin/
+dist/
+*.js
+*.js.map
+*.d.ts
+.pulumi/
+Pulumi.*.yaml
+.env
+.env.local
+*.swp
+*.swo
+*~
+.DS_Store
