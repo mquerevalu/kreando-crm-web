@@ -58,6 +58,9 @@ const CompaniesPage: React.FC = () => {
         estado: editingCompany.estado,
         prompt: editingCompany.prompt,
         urlWebHook: editingCompany.urlWebHook,
+        phoneNumberId: editingCompany.phoneNumberId,
+        wspNumberId: editingCompany.wspNumberId,
+        accountId: editingCompany.accountId,
       };
 
       const updated = await companyService.updateCompany(selectedCompany.configId, updateData);
@@ -229,39 +232,42 @@ const CompaniesPage: React.FC = () => {
                 />
               </div>
 
+              {/* Phone Number ID */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number ID</label>
+                <input
+                  type="text"
+                  value={editingCompany.phoneNumberId || ''}
+                  onChange={(e) => handleInputChange('phoneNumberId', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* WSP Number ID */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">WSP Number ID</label>
+                <input
+                  type="text"
+                  value={editingCompany.wspNumberId || ''}
+                  onChange={(e) => handleInputChange('wspNumberId', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Account ID */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Account ID</label>
+                <input
+                  type="text"
+                  value={editingCompany.accountId || ''}
+                  onChange={(e) => handleInputChange('accountId', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
               {/* Read-only Fields */}
               <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                 <p className="text-sm font-semibold text-gray-700 mb-3">Información de Solo Lectura</p>
-                
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Phone Number ID</label>
-                  <input
-                    type="text"
-                    value={selectedCompany.phoneNumberId}
-                    disabled
-                    className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded text-sm text-gray-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">WSP Number ID</label>
-                  <input
-                    type="text"
-                    value={selectedCompany.wspNumberId}
-                    disabled
-                    className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded text-sm text-gray-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Account ID</label>
-                  <input
-                    type="text"
-                    value={selectedCompany.accountId}
-                    disabled
-                    className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded text-sm text-gray-600"
-                  />
-                </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Fecha de Creación</label>
