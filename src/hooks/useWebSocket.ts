@@ -13,23 +13,35 @@ interface WebSocketMessage {
 
 type MessageHandler = (message: WebSocketMessage) => void;
 
-export const useWebSocket = (pageId: string, onMessage: MessageHandler) => {
+export const useWebSocket = (pageId: string, senderId: string | undefined, onMessage: MessageHandler) => {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const reconnectAttemptsRef = useRef(0);
+  const onMessageRef = useRef(onMessage);
   const maxReconnectAttempts = 5;
   const reconnectDelay = 3000; // 3 segundos
 
+  // Actualizar la referencia de onMessage sin causar reconexión
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
+
   const connect = useCallback(() => {
-    // No conectar si no hay pageId
-    if (!pageId) {
-      logger.warn('Cannot connect: pageId is not set');
+    // No conectar si no hay pageId o senderId
+    if (!pageId || !senderId) {
+      logger.warn(`Cannot connect: pageId=${pageId}, senderId=${senderId}`);
+      return;
+    }
+
+    // No reconectar si ya hay una conexión activa
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      logger.info(`WebSocket already connected, skipping reconnect`);
       return;
     }
 
     try {
       const wsUrl = process.env.REACT_APP_WEBSOCKET_URL || 'ws://localhost:3001';
-      const url = `${wsUrl}?pageId=${encodeURIComponent(pageId)}`;
+      const url = `${wsUrl}?pageId=${encodeURIComponent(pageId)}&senderId=${encodeURIComponent(senderId)}`;
 
       logger.info(`Connecting to WebSocket: ${url}`);
       const ws = new WebSocket(url);
@@ -43,7 +55,7 @@ export const useWebSocket = (pageId: string, onMessage: MessageHandler) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           logger.info(`📨 WebSocket message received:`, message);
-          onMessage(message);
+          onMessageRef.current(message);
         } catch (error) {
           logger.error('Error parsing WebSocket message:', error);
         }
@@ -73,7 +85,7 @@ export const useWebSocket = (pageId: string, onMessage: MessageHandler) => {
     } catch (error) {
       logger.error('Error connecting to WebSocket:', error);
     }
-  }, [pageId, onMessage]);
+  }, [pageId, senderId]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -95,14 +107,14 @@ export const useWebSocket = (pageId: string, onMessage: MessageHandler) => {
   }, []);
 
   useEffect(() => {
-    if (pageId) {
+    if (pageId && senderId) {
       connect();
     }
 
     return () => {
       disconnect();
     };
-  }, [pageId, connect, disconnect]);
+  }, [pageId, senderId, connect, disconnect]);
 
   return { send, isConnected: wsRef.current?.readyState === WebSocket.OPEN };
 };

@@ -23,7 +23,6 @@ interface Message {
 }
 
 const ConversationsPage: React.FC = () => {
-  const { user } = useAuthStore();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -32,6 +31,12 @@ const ConversationsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectedConversationRef = useRef<Conversation | null>(null);
+
+  // Mantener la referencia actualizada
+  useEffect(() => {
+    selectedConversationRef.current = selectedConversation;
+  }, [selectedConversation]);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -53,16 +58,14 @@ const ConversationsPage: React.FC = () => {
   const handleWebSocketMessage = useCallback((wsMessage: any) => {
     if (wsMessage.type === 'message') {
       // Nuevo mensaje recibido
-      if (selectedConversation && selectedConversation.senderId === wsMessage.senderId) {
-        const newMessage: Message = {
-          id: `ws-${Date.now()}`,
-          sender: wsMessage.data.direction === 'incoming' ? (wsMessage.data.senderName || 'Usuario') : 'Bot',
-          content: wsMessage.data.message,
-          timestamp: new Date(wsMessage.data.timestamp).toISOString(),
-          direction: wsMessage.data.direction === 'incoming' ? 'inbound' : 'outbound',
-        };
-        setMessages(prev => [...prev, newMessage]);
-      }
+      const newMessage: Message = {
+        id: `ws-${Date.now()}`,
+        sender: wsMessage.data.direction === 'incoming' ? (wsMessage.data.senderName || 'Usuario') : 'Bot',
+        content: wsMessage.data.message,
+        timestamp: new Date(wsMessage.data.timestamp).toISOString(),
+        direction: wsMessage.data.direction === 'incoming' ? 'inbound' : 'outbound',
+      };
+      setMessages(prev => [...prev, newMessage]);
     } else if (wsMessage.type === 'conversation_update') {
       // Actualizar conversación
       setConversations(prev =>
@@ -73,10 +76,10 @@ const ConversationsPage: React.FC = () => {
         )
       );
     }
-  }, [selectedConversation]);
+  }, []);
 
-  // Conectar WebSocket
-  useWebSocket(pageId, handleWebSocketMessage);
+  // Conectar WebSocket con el senderId de la conversación seleccionada
+  useWebSocket(pageId, selectedConversation?.senderId, handleWebSocketMessage);
 
   useEffect(() => {
     loadConversations();
@@ -229,13 +232,6 @@ const ConversationsPage: React.FC = () => {
                   </div>
                   <p className="text-sm text-gray-600 truncate">{conversation.lastMessage}</p>
                 </div>
-
-                {/* Unread Badge */}
-                {conversation.unreadCount > 0 && (
-                  <div className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {conversation.unreadCount}
-                  </div>
-                )}
               </button>
             ))
           )}
@@ -333,7 +329,7 @@ const ConversationsPage: React.FC = () => {
                   placeholder="Escribe un mensaje..."
                   value={replyMessage}
                   onChange={(e) => setReplyMessage(e.target.value)}
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       handleSendReply();

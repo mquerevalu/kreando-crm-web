@@ -17,12 +17,13 @@ apiClient.interceptors.request.use((config) => {
 
 interface Conversation {
   id: string;
+  pageId: string;
+  senderId: string;
   phoneNumber: string;
   participantName?: string;
   lastMessage: string;
   lastMessageTime: string;
-  unreadCount: number;
-  status: 'active' | 'archived';
+  status: 'active' | 'archived' | 'completed';
 }
 
 interface Message {
@@ -37,29 +38,32 @@ interface Message {
 const MOCK_CONVERSATIONS: Conversation[] = [
   {
     id: 'conv-1',
+    pageId: 'whatsapp-1026217640567682',
+    senderId: '51940281263',
     phoneNumber: '+34 612 345 678',
     participantName: 'Juan García',
     lastMessage: 'Hola, ¿cuál es el precio de la lavadora?',
     lastMessageTime: 'Hace 5 minutos',
-    unreadCount: 2,
     status: 'active',
   },
   {
     id: 'conv-2',
+    pageId: 'whatsapp-1026217640567682',
+    senderId: '51940281264',
     phoneNumber: '+34 623 456 789',
     participantName: 'María López',
     lastMessage: 'Gracias por la información',
     lastMessageTime: 'Hace 1 hora',
-    unreadCount: 0,
     status: 'active',
   },
   {
     id: 'conv-3',
+    pageId: 'whatsapp-1026217640567682',
+    senderId: '51940281265',
     phoneNumber: '+34 634 567 890',
     participantName: 'Carlos Rodríguez',
     lastMessage: 'Necesito una cotización urgente',
     lastMessageTime: 'Hace 2 horas',
-    unreadCount: 1,
     status: 'active',
   },
 ];
