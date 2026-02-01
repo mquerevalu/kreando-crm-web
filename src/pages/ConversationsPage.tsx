@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { conversationService } from '../services/conversationService';
+import { companyService, Company } from '../services/companyService';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 interface Conversation {
@@ -23,6 +24,8 @@ interface Message {
 }
 
 const ConversationsPage: React.FC = () => {
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -38,21 +41,46 @@ const ConversationsPage: React.FC = () => {
     selectedConversationRef.current = selectedConversation;
   }, [selectedConversation]);
 
+  // Cargar empresas al montar
+  useEffect(() => {
+    const loadCompanies = async () => {
+      try {
+        const data = await companyService.getCompanies();
+        setCompanies(data);
+        if (data.length > 0) {
+          setSelectedCompany(data[0]);
+        }
+      } catch (error) {
+        console.error('Error loading companies:', error);
+      }
+    };
+    loadCompanies();
+  }, []);
+
   const loadConversations = useCallback(async () => {
+    if (!selectedCompany?.phoneNumberId) return;
+
     try {
       setLoading(true);
       // Usar pageId en formato whatsapp-{phoneNumberId}
-      const pageId = 'whatsapp-1026217640567682'; // TODO: obtener del contexto de la empresa
+      const pageId = `whatsapp-${selectedCompany.phoneNumberId}`;
       const data = await conversationService.getConversations(pageId);
       setConversations(data);
+      setSelectedConversation(null);
+      setMessages([]);
     } catch (error) {
       console.error('Error loading conversations:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedCompany]);
 
-  const pageId = 'whatsapp-1026217640567682'; // TODO: obtener del contexto de la empresa
+  // Cargar conversaciones cuando cambia la empresa seleccionada
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  const pageId = selectedCompany ? `whatsapp-${selectedCompany.phoneNumberId}` : '';
 
   // Manejar mensajes WebSocket
   const handleWebSocketMessage = useCallback((wsMessage: any) => {
@@ -92,10 +120,6 @@ const ConversationsPage: React.FC = () => {
   // Conectar WebSocket con el senderId de la conversación seleccionada
   useWebSocket(pageId, selectedConversation?.senderId, handleWebSocketMessage);
 
-  useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -124,8 +148,12 @@ const ConversationsPage: React.FC = () => {
       // Reload messages
       const data = await conversationService.getMessages(selectedConversation.pageId, selectedConversation.senderId);
       setMessages(data);
-      // Reload conversations to update last message
-      await loadConversations();
+      // Reload conversations to update last message pero mantener la conversación seleccionada
+      if (selectedCompany?.phoneNumberId) {
+        const pageId = `whatsapp-${selectedCompany.phoneNumberId}`;
+        const conversationsData = await conversationService.getConversations(pageId);
+        setConversations(conversationsData);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
@@ -173,8 +201,12 @@ const ConversationsPage: React.FC = () => {
       // Reload messages
       const data = await conversationService.getMessages(selectedConversation.pageId, selectedConversation.senderId);
       setMessages(data);
-      // Reload conversations to update last message
-      await loadConversations();
+      // Reload conversations to update last message pero mantener la conversación seleccionada
+      if (selectedCompany?.phoneNumberId) {
+        const pageId = `whatsapp-${selectedCompany.phoneNumberId}`;
+        const conversationsData = await conversationService.getConversations(pageId);
+        setConversations(conversationsData);
+      }
     } catch (error) {
       console.error('Error sending file:', error);
     } finally {
@@ -196,6 +228,28 @@ const ConversationsPage: React.FC = () => {
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
           <h1 className="text-2xl font-bold">💬 Mensajes</h1>
           <p className="text-blue-100 text-sm mt-1">Gestión de conversaciones</p>
+        </div>
+
+        {/* Company Selector */}
+        <div className="p-4 bg-gray-50 border-b border-gray-200">
+          <label className="block text-xs font-semibold text-gray-700 mb-2">Selecciona una empresa</label>
+          <select
+            value={selectedCompany?.configId || ''}
+            onChange={(e) => {
+              const company = companies.find(c => c.configId === e.target.value);
+              if (company) {
+                setSelectedCompany(company);
+              }
+            }}
+            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          >
+            <option value="">-- Selecciona una empresa --</option>
+            {companies.map((company) => (
+              <option key={company.configId} value={company.configId}>
+                {company.nombreEmpresa}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Search Bar */}
