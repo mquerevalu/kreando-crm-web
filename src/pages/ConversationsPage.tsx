@@ -34,7 +34,59 @@ const ConversationsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showWebhookModal, setShowWebhookModal] = useState(false);
   const [webhookData, setWebhookData] = useState<any>(null);
-  const [contactSource, setContactSource] = useState('WhatsApp');
+  const [contactSource, setContactSource] = useState('4');
+  const [webhookModalTab, setWebhookModalTab] = useState<'form' | 'questions'>('form');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Opciones para los selectores
+  const sectorOptions = [
+    { id: 33, valor: 'Agro Industria' },
+    { id: 25, valor: 'Agro Industria' },
+    { id: 41, valor: 'Agro Industria' },
+    { id: 26, valor: 'Albergue' },
+    { id: 27, valor: 'Apicultura' },
+    { id: 28, valor: 'Asilo de ancianos' },
+    { id: 29, valor: 'Barco' },
+    { id: 30, valor: 'Catering' },
+    { id: 31, valor: 'Centro de Salud' },
+    { id: 32, valor: 'Centro Esparcimiento' },
+    { id: 62, valor: 'Centro Naval /Marina de Guerra' },
+    { id: 34, valor: 'Clínica' },
+    { id: 35, valor: 'Club Deportivo' },
+    { id: 36, valor: 'Club Social' },
+    { id: 39, valor: 'Colegio' },
+    { id: 40, valor: 'Condominios' },
+    { id: 42, valor: 'Contratista' },
+    { id: 43, valor: 'Distribuidor / Intermediario' },
+    { id: 44, valor: 'Domicilio' },
+    { id: 60, valor: 'Ejercito' },
+    { id: 37, valor: 'Empresa de Telecomunicaciones' },
+    { id: 38, valor: 'Empresa de Transporte' },
+    { id: 61, valor: 'Fuerza Aerea' },
+    { id: 46, valor: 'Hospital' },
+    { id: 47, valor: 'Hotel' },
+    { id: 48, valor: 'Iglesia' },
+    { id: 49, valor: 'Industria en General' },
+    { id: 50, valor: 'Lavanderia Comercial' },
+    { id: 51, valor: 'Lavanderia Industrial' },
+    { id: 52, valor: 'Mina' },
+    { id: 56, valor: 'Municipalidad' },
+    { id: 45, valor: 'Oficina' },
+    { id: 53, valor: 'Peluquería' },
+    { id: 54, valor: 'Pesquero' },
+    { id: 55, valor: 'Petrolero /Exploracion' },
+    { id: 57, valor: 'Restaurante' },
+    { id: 58, valor: 'Textil / Confeccionista' },
+    { id: 59, valor: 'Universidad' },
+  ];
+
+  const condicionOptions = [
+    { id: 22, valor: 'EXPORTACIÓN' },
+    { id: 23, valor: 'EXW' },
+    { id: 20, valor: 'LIMA' },
+    { id: 21, valor: 'PROVINCIA' },
+    { id: 24, valor: 'PROYECTO' },
+  ];
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedConversationRef = useRef<Conversation | null>(null);
@@ -254,11 +306,20 @@ const ConversationsPage: React.FC = () => {
     }
 
     const questionsAnswers = extractQuestionsAndAnswers();
+    
+    // Crear descripción solo con las respuestas del cliente
+    const clientResponses = questionsAnswers
+      .map((qa: any) => qa.answer)
+      .join(' | ');
+    
     const dataToSend = {
       phoneNumber: selectedConversation?.phoneNumber,
       participantName: selectedConversation?.participantName || 'Sin nombre',
       questionsAnswers: questionsAnswers,
       contactSource: contactSource,
+      sector: '25', // Valor por defecto
+      condicion: '20', // Valor por defecto
+      descripcion: clientResponses,
       timestamp: new Date().toISOString(),
     };
 
@@ -271,13 +332,37 @@ const ConversationsPage: React.FC = () => {
 
     try {
       setLoading(true);
-      await conversationService.sendToWebhook(selectedCompany.urlWebHook, webhookData);
-      alert('Datos enviados al webhook correctamente');
+      
+      // Transformar los datos al formato esperado por la API
+      const transformedData = {
+        celular: webhookData.phoneNumber.replace(/\D/g, ''), // Solo números
+        clieNombre: webhookData.participantName,
+        clieNumero: '', // No disponible en los datos actuales
+        clieTipDoc: '', // No disponible en los datos actuales
+        condicion: parseInt(webhookData.condicion), // ID de la condición
+        clieDireccion: '', // No disponible en los datos actuales
+        email: '', // No disponible en los datos actuales
+        fuente: parseInt(webhookData.contactSource), // ID de la fuente
+        sector: parseInt(webhookData.sector), // ID del sector
+        telefono: webhookData.phoneNumber.replace(/\D/g, ''), // Solo números
+        contacto: webhookData.participantName,
+        puesto: '', // No disponible en los datos actuales
+        descripcion: webhookData.descripcion, // Descripción editada por el usuario
+        usuario: '', // Se puede obtener del usuario logueado si es necesario
+        operacion: 'saveLead',
+      };
+      
+      await conversationService.sendToWebhook(selectedCompany.urlWebHook, transformedData);
+      setSuccessMessage('✓ Datos enviados al webhook correctamente');
       setShowWebhookModal(false);
       setWebhookData(null);
+      
+      // Limpiar el mensaje después de 3 segundos
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (error) {
       console.error('Error sending to webhook:', error);
-      alert('Error al enviar datos al webhook');
+      setSuccessMessage('✗ Error al enviar datos al webhook');
+      setTimeout(() => setSuccessMessage(null), 3000);
     } finally {
       setLoading(false);
     }
@@ -510,74 +595,149 @@ const ConversationsPage: React.FC = () => {
 
       {/* Webhook Modal */}
       {showWebhookModal && webhookData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
               <h2 className="text-xl font-bold">Validar datos para enviar</h2>
               <p className="text-blue-100 text-sm mt-1">Revisa los datos antes de enviar al webhook</p>
             </div>
 
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 bg-gray-50">
+              <button
+                onClick={() => setWebhookModalTab('form')}
+                className={`flex-1 px-4 py-3 font-semibold text-sm transition ${
+                  webhookModalTab === 'form'
+                    ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                📋 Formulario
+              </button>
+              <button
+                onClick={() => setWebhookModalTab('questions')}
+                className={`flex-1 px-4 py-3 font-semibold text-sm transition ${
+                  webhookModalTab === 'questions'
+                    ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                ❓ Preguntas
+              </button>
+            </div>
+
             {/* Content */}
-            <div className="p-6 space-y-4">
-              {/* Nombre */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre</label>
-                <input
-                  type="text"
-                  value={webhookData.participantName}
-                  onChange={(e) => setWebhookData({ ...webhookData, participantName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-              </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {webhookModalTab === 'form' ? (
+                <div className="space-y-4">
+                  {/* Nombre */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre</label>
+                    <input
+                      type="text"
+                      value={webhookData.participantName}
+                      onChange={(e) => setWebhookData({ ...webhookData, participantName: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
 
-              {/* Teléfono */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Teléfono</label>
-                <input
-                  type="text"
-                  value={webhookData.phoneNumber}
-                  onChange={(e) => setWebhookData({ ...webhookData, phoneNumber: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
-                />
-              </div>
+                  {/* Teléfono */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Teléfono</label>
+                    <input
+                      type="text"
+                      value={webhookData.phoneNumber}
+                      onChange={(e) => setWebhookData({ ...webhookData, phoneNumber: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                    />
+                  </div>
 
-              {/* Fuente de Contacto */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Fuente de Contacto</label>
-                <select
-                  value={webhookData.contactSource}
-                  onChange={(e) => setWebhookData({ ...webhookData, contactSource: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                >
-                  <option value="WhatsApp">WhatsApp</option>
-                  <option value="TikTok">TikTok</option>
-                  <option value="Instagram">Instagram</option>
-                  <option value="Facebook">Facebook</option>
-                  <option value="Otro">Otro</option>
-                </select>
-              </div>
+                  {/* Fuente de Contacto */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Fuente de Contacto</label>
+                    <select
+                      value={webhookData.contactSource}
+                      onChange={(e) => setWebhookData({ ...webhookData, contactSource: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    >
+                      <option value="4">WhatsApp</option>
+                      <option value="3">Facebook</option>
+                      <option value="10">TikTok</option>
+                      <option value="2">Formulario Web</option>
+                      <option value="5">Llamada Mensaje Directo</option>
+                      <option value="8">Referido</option>
+                      <option value="6">Cliente Antiguo</option>
+                      <option value="65">Feria EXPOMIN</option>
+                      <option value="11">Formulario Adex</option>
+                      <option value="64">Referido CALIDDA</option>
+                      <option value="7">Referido por Alicorp</option>
+                      <option value="9">Visita Presencial</option>
+                    </select>
+                  </div>
 
-              {/* Preguntas y Respuestas */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Preguntas Respondidas</label>
-                <div className="bg-gray-50 rounded-lg p-3 max-h-48 overflow-y-auto space-y-3">
+                  {/* Sector */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Sector</label>
+                    <select
+                      value={webhookData.sector}
+                      onChange={(e) => setWebhookData({ ...webhookData, sector: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    >
+                      {sectorOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.valor}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Condición */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Condición</label>
+                    <select
+                      value={webhookData.condicion}
+                      onChange={(e) => setWebhookData({ ...webhookData, condicion: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    >
+                      {condicionOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.valor}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Descripción */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Descripción</label>
+                    <textarea
+                      value={webhookData.descripcion}
+                      onChange={(e) => setWebhookData({ ...webhookData, descripcion: e.target.value })}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="Resumen de respuestas del cliente"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
                   {webhookData.questionsAnswers.length === 0 ? (
                     <p className="text-sm text-gray-500">No hay preguntas respondidas</p>
                   ) : (
                     webhookData.questionsAnswers.map((qa: any, idx: number) => (
-                      <div key={idx} className="bg-white p-2 rounded border border-gray-200">
-                        <p className="text-xs font-semibold text-gray-700">P: {qa.question}</p>
-                        <p className="text-xs text-gray-600 mt-1">R: {qa.answer}</p>
+                      <div key={idx} className="bg-gray-50 p-3 rounded border border-gray-200">
+                        <p className="text-xs font-semibold text-gray-700 mb-1">P: {qa.question}</p>
+                        <p className="text-xs text-gray-600">R: {qa.answer}</p>
                       </div>
                     ))
                   )}
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Actions */}
-            <div className="border-t border-gray-200 p-6 flex gap-3 justify-end">
+            <div className="border-t border-gray-200 p-6 flex gap-3 justify-end bg-white">
               <button
                 onClick={() => {
                   setShowWebhookModal(false);
@@ -597,6 +757,17 @@ const ConversationsPage: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {successMessage && (
+        <div className={`fixed bottom-6 right-6 px-6 py-4 rounded-lg shadow-lg text-white font-semibold transition-all z-40 ${
+          successMessage.startsWith('✓') 
+            ? 'bg-gradient-to-r from-green-500 to-green-600' 
+            : 'bg-gradient-to-r from-red-500 to-red-600'
+        }`}>
+          {successMessage}
         </div>
       )}
     </div>
