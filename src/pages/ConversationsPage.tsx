@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { conversationService } from '../services/conversationService';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 interface Conversation {
   id: string;
@@ -30,6 +31,7 @@ const ConversationsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -44,6 +46,37 @@ const ConversationsPage: React.FC = () => {
       setLoading(false);
     }
   }, []);
+
+  const pageId = 'whatsapp-1026217640567682'; // TODO: obtener del contexto de la empresa
+
+  // Manejar mensajes WebSocket
+  const handleWebSocketMessage = useCallback((wsMessage: any) => {
+    if (wsMessage.type === 'message') {
+      // Nuevo mensaje recibido
+      if (selectedConversation && selectedConversation.senderId === wsMessage.senderId) {
+        const newMessage: Message = {
+          id: `ws-${Date.now()}`,
+          sender: wsMessage.data.direction === 'incoming' ? (wsMessage.data.senderName || 'Usuario') : 'Bot',
+          content: wsMessage.data.message,
+          timestamp: new Date(wsMessage.data.timestamp).toISOString(),
+          direction: wsMessage.data.direction === 'incoming' ? 'inbound' : 'outbound',
+        };
+        setMessages(prev => [...prev, newMessage]);
+      }
+    } else if (wsMessage.type === 'conversation_update') {
+      // Actualizar conversación
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.senderId === wsMessage.senderId
+            ? { ...conv, lastMessage: wsMessage.data.lastMessage }
+            : conv
+        )
+      );
+    }
+  }, [selectedConversation]);
+
+  // Conectar WebSocket
+  useWebSocket(pageId, handleWebSocketMessage);
 
   useEffect(() => {
     loadConversations();
@@ -81,6 +114,55 @@ const ConversationsPage: React.FC = () => {
       await loadConversations();
     } catch (error) {
       console.error('Error sending message:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedConversation) return;
+
+    try {
+      setLoading(true);
+      
+      // Determinar tipo de archivo
+      let fileType = 'document';
+      if (file.type.startsWith('image/')) {
+        fileType = 'image';
+      } else if (file.type.startsWith('video/')) {
+        fileType = 'video';
+      } else if (file.type.startsWith('audio/')) {
+        fileType = 'audio';
+      }
+
+      // En producción, necesitarías subir el archivo a S3 o similar
+      // Por ahora, usamos una URL de ejemplo
+      const fileUrl = URL.createObjectURL(file);
+      
+      console.log(`Sending ${fileType}: ${file.name}`);
+      
+      await conversationService.sendFile(
+        selectedConversation.pageId,
+        selectedConversation.senderId,
+        fileUrl,
+        fileType,
+        file.name,
+        replyMessage || undefined
+      );
+
+      setReplyMessage('');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
+      // Reload messages
+      const data = await conversationService.getMessages(selectedConversation.pageId, selectedConversation.senderId);
+      setMessages(data);
+      // Reload conversations to update last message
+      await loadConversations();
+    } catch (error) {
+      console.error('Error sending file:', error);
     } finally {
       setLoading(false);
     }
@@ -232,9 +314,20 @@ const ConversationsPage: React.FC = () => {
             {/* Input Area */}
             <div className="bg-white border-t border-gray-200 p-4">
               <div className="flex gap-2 items-end">
-                <button className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600 text-xl">
-                  ➕
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600 text-xl"
+                  title="Enviar archivo"
+                >
+                  📎
                 </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                />
                 <input
                   type="text"
                   placeholder="Escribe un mensaje..."

@@ -206,6 +206,20 @@ export const conversationService = {
     }
   },
 
+  sendFile: async (pageId: string, senderId: string, fileUrl: string, fileType: string, fileName?: string, caption?: string): Promise<Message> => {
+    logApiCall('POST', `/conversations/messages?pageId=${pageId}&senderId=${senderId}`, { fileUrl, fileType, fileName, caption });
+    try {
+      const response = await apiClient.post('/conversations/messages', { fileUrl, fileType, fileName, caption }, {
+        params: { pageId, senderId },
+      });
+      logApiResponse('POST', `/conversations/messages`, response.data);
+      return response.data;
+    } catch (error) {
+      console.warn('API error:', error);
+      throw error;
+    }
+  },
+
   archiveConversation: async (pageId: string, senderId: string): Promise<void> => {
     logApiCall('PUT', `/conversations/archive?pageId=${pageId}&senderId=${senderId}`);
     try {
