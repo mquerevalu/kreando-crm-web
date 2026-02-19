@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { companyService, Company } from '../services/companyService';
 import CompanyFlowBuilder from '../components/CompanyFlowBuilder';
 import FlowBuilderModal from '../components/FlowBuilderModal';
+import { KnowledgeBaseUploadModal } from '../components/KnowledgeBaseUploadModal';
 
 interface FlowStep {
   stepId: string;
@@ -32,6 +33,7 @@ const CompaniesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'info' | 'flow'>('info');
   const [flowSteps, setFlowSteps] = useState<FlowStep[]>([]);
   const [showFlowModal, setShowFlowModal] = useState(false);
+  const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState(false);
 
   const loadCompanies = useCallback(async () => {
     try {
@@ -218,6 +220,13 @@ const CompaniesPage: React.FC = () => {
                 title="Abrir editor de flujo en pantalla completa"
               >
                 🖥️ Pantalla Completa
+              </button>
+              <button
+                onClick={() => setShowKnowledgeBaseModal(true)}
+                className="px-8 py-4 font-semibold text-sm text-green-600 hover:text-green-800 transition flex items-center gap-2"
+                title="Subir base de conocimiento desde Excel"
+              >
+                📊 Subir Excel a Pinecone
               </button>
             </div>
 
@@ -416,6 +425,16 @@ const CompaniesPage: React.FC = () => {
           onUpdateStep={handleUpdateStep}
           onDeleteStep={handleDeleteStep}
           onClose={() => setShowFlowModal(false)}
+        />
+      )}
+
+      {/* Knowledge Base Upload Modal */}
+      {selectedCompany && (
+        <KnowledgeBaseUploadModal
+          isOpen={showKnowledgeBaseModal}
+          onClose={() => setShowKnowledgeBaseModal(false)}
+          companyId={selectedCompany.configId}
+          companyName={selectedCompany.nombreEmpresa}
         />
       )}
     </div>
