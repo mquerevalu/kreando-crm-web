@@ -26,6 +26,7 @@ export interface Company {
   estado: 'active' | 'inactive';
   prompt: string;
   urlWebHook: string;
+  pineconeNamespaces?: string | string[];
   fechaCreacion: number;
   fechaActualizacion: number;
   flujoBot?: any[];

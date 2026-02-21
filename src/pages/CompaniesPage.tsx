@@ -101,6 +101,7 @@ const CompaniesPage: React.FC = () => {
         phoneNumberId: editingCompany.phoneNumberId,
         wspNumberId: editingCompany.wspNumberId,
         accountId: editingCompany.accountId,
+        pineconeNamespaces: (editingCompany as any).pineconeNamespaces,
         ...(activeTab === 'flow' && { flujoBot: flowSteps as any }),
       };
 
@@ -303,6 +304,38 @@ const CompaniesPage: React.FC = () => {
                       rows={5}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                  </div>
+
+                  {/* Pinecone Namespaces */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Namespaces de Pinecone
+                      <span className="text-xs text-gray-500 font-normal ml-2">(separados por comas)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={
+                        Array.isArray((editingCompany as any).pineconeNamespaces)
+                          ? (editingCompany as any).pineconeNamespaces.join(', ')
+                          : (editingCompany as any).pineconeNamespaces || ''
+                      }
+                      onChange={(e) => {
+                        const value = e.target.value.trim();
+                        if (value === '') {
+                          handleInputChange('pineconeNamespaces' as any, undefined);
+                        } else if (value.includes(',')) {
+                          const namespaces = value.split(',').map(ns => ns.trim()).filter(ns => ns);
+                          handleInputChange('pineconeNamespaces' as any, namespaces);
+                        } else {
+                          handleInputChange('pineconeNamespaces' as any, value);
+                        }
+                      }}
+                      placeholder="default o empresa-abc, productos-generales"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 Deja vacío para usar "default". Usa comas para múltiples namespaces.
+                    </p>
                   </div>
 
                   {/* URL WebHook */}
