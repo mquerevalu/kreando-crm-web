@@ -167,3 +167,16 @@ For a typical small application, expect ~$1-5/month.
 3. Upload to S3: `aws s3 sync dist/ s3://<bucket-name>/ --delete`
 4. Access via CloudFront domain name
 5. (Optional) Add custom domain with Route53 and ACM certificate
+cd reg-vectia-workflow-web-b2b/infra
+
+# 1. Crear un nuevo stack para producción (si no existe)
+pulumi stack init prd
+
+# O si ya existe, seleccionarlo
+pulumi stack select prd
+
+# 2. Configurar la región para el stack prd
+pulumi config set aws:region us-east-1
+
+# 3. Desplegar
+pulumi up
