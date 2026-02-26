@@ -4,7 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 const config = new pulumi.Config();
-const awsRegion = config.get("aws:region") || "us-east-2";
+const awsRegion = config.get("aws:region") || "us-east-1";
 
 // Create S3 bucket for hosting the web app
 const bucket = new aws.s3.Bucket("kreando-agente-web", {
