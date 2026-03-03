@@ -203,6 +203,9 @@ const ConversationsPage: React.FC = () => {
           content: wsMessage.data.message,
           timestamp: new Date(wsMessage.data.timestamp).toISOString(),
           direction: wsMessage.data.direction === 'incoming' ? 'inbound' : 'outbound',
+          s3Key: wsMessage.data.s3Key,
+          mediaType: wsMessage.data.mediaType,
+          mediaFileName: wsMessage.data.mediaFileName,
         };
         setMessages(prev => [...prev, newMessage]);
       } else {
