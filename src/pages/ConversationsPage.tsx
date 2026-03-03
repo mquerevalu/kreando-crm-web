@@ -42,6 +42,7 @@ const ConversationsPage: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [hasMoreConversations, setHasMoreConversations] = useState(false);
   const [lastConversationKey, setLastConversationKey] = useState<string | undefined>(undefined);
+  const [showChatInMobile, setShowChatInMobile] = useState(false);
 
   // Opciones para los selectores
   const sectorOptions = [
@@ -242,6 +243,7 @@ const ConversationsPage: React.FC = () => {
 
   const handleSelectConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
+    setShowChatInMobile(true); // Mostrar chat en mobile
     try {
       const data = await conversationService.getMessages(conversation.pageId, conversation.senderId);
       setMessages(data);
@@ -259,6 +261,11 @@ const ConversationsPage: React.FC = () => {
     } catch (error) {
       console.error('Error loading messages:', error);
     }
+  };
+
+  const handleBackToConversations = () => {
+    setShowChatInMobile(false);
+    setSelectedConversation(null);
   };
 
   const handleSendReply = async () => {
@@ -455,12 +462,11 @@ const ConversationsPage: React.FC = () => {
 
   return (
     <div className="flex h-full bg-gray-50">
-      {/* Conversations List - WhatsApp Style */}
-      <div className="w-96 bg-white flex flex-col border-r border-gray-200 shadow-sm">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
-          <h1 className="text-2xl font-bold">💬 Mensajes</h1>
-          <p className="text-blue-100 text-sm mt-1">Gestión de conversaciones</p>
+      {/* Conversations List - WhatsApp Style - Ocultar en mobile cuando hay chat seleccionado */}
+      <div className={`${showChatInMobile ? 'hidden' : 'flex'} md:flex w-full md:w-96 bg-white flex-col border-r border-gray-200 shadow-sm`}>
+        {/* Header - Estilo WhatsApp */}
+        <div className="bg-[#008069] text-white p-4">
+          <h1 className="text-xl font-semibold">Mensajes</h1>
         </div>
 
         {/* Company Selector */}
@@ -555,63 +561,62 @@ const ConversationsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Messages Area - WhatsApp Style */}
-      <div className="flex-1 flex flex-col bg-white">
+      {/* Messages Area - WhatsApp Style - Mostrar en mobile solo cuando hay chat seleccionado */}
+      <div className={`${!showChatInMobile && selectedConversation ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-white`}>
         {selectedConversation ? (
           <>
-            {/* Chat Header */}
-            <div className="bg-white border-b border-gray-200 p-6 flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-3 flex-1">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold">
-                  {(selectedConversation.participantName || selectedConversation.phoneNumber).charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {selectedConversation.participantName || 'Usuario'}
-                    </h3>
-                    {selectedConversation.crmIntegrated && (
-                      <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
-                        ✓ Integrado con CRM
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-xs text-gray-500">En línea</p>
-                    <span className="text-xs text-gray-400">•</span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(selectedConversation.phoneNumber);
-                        alert('Número copiado: ' + selectedConversation.phoneNumber);
-                      }}
-                      className="text-xs text-blue-600 hover:text-blue-800 hover:underline transition font-mono"
-                      title="Haz clic para copiar"
-                    >
-                      {selectedConversation.phoneNumber}
-                    </button>
-                  </div>
-                </div>
+            {/* Chat Header - Estilo WhatsApp */}
+            <div className="bg-[#008069] text-white p-3 flex items-center gap-3 shadow-md">
+              {/* Botón volver (solo mobile) */}
+              <button 
+                onClick={handleBackToConversations}
+                className="md:hidden p-2 hover:bg-white/10 rounded-full transition"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              
+              {/* Avatar y nombre */}
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg">
+                {(selectedConversation.participantName || selectedConversation.phoneNumber).charAt(0).toUpperCase()}
               </div>
-              <div className="flex gap-2">
+              
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-white truncate">
+                  {selectedConversation.participantName || 'Usuario'}
+                </h3>
+                <p className="text-xs text-white/80 truncate">{selectedConversation.phoneNumber}</p>
+              </div>
+              
+              {/* Acciones */}
+              <div className="flex gap-1">
+                {selectedConversation.crmIntegrated && (
+                  <span className="hidden md:inline-flex px-2 py-1 bg-white/20 text-white text-xs rounded-full">
+                    ✓ CRM
+                  </span>
+                )}
                 <button 
                   onClick={handleOpenWebhookModal}
-                  disabled={loading || !selectedCompany?.urlWebHook || selectedConversation.crmIntegrated}
-                  className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={selectedConversation.crmIntegrated ? "Ya integrado con CRM" : "Enviar a webhook"}
+                  disabled={loading || !selectedCompany?.urlWebHook}
+                  className="p-2 hover:bg-white/10 rounded-full transition disabled:opacity-50"
+                  title="Enviar a webhook"
                 >
-                  🔗
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
                 </button>
-                <button className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600">
-                  🔍
-                </button>
-                <button className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600">
-                  ⋮
+                <button className="hidden md:block p-2 hover:bg-white/10 rounded-full transition">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                  </svg>
                 </button>
               </div>
             </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50">
+            {/* Messages - Fondo estilo WhatsApp */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#efeae2]" style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h100v100H0z\' fill=\'%23efeae2\'/%3E%3Cpath d=\'M20 20h60v60H20z\' fill=\'%23f0f0f0\' opacity=\'.1\'/%3E%3C/svg%3E")'}}>
+
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-gray-500">
                   <div className="text-center">
@@ -627,18 +632,14 @@ const ConversationsPage: React.FC = () => {
                       className={`flex ${message.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-xs px-4 py-2 rounded-2xl ${
+                        className={`max-w-[85%] md:max-w-md px-3 py-2 rounded-lg shadow ${
                           message.direction === 'outbound'
-                            ? 'bg-blue-600 text-white rounded-br-none shadow-sm'
-                            : 'bg-white text-gray-900 rounded-bl-none border border-gray-200 shadow-sm'
+                            ? 'bg-[#d9fdd3] text-gray-900'
+                            : 'bg-white text-gray-900'
                         }`}
                       >
-                        <p className="text-sm break-words">{message.content}</p>
-                        <p className={`text-xs mt-1 ${
-                          message.direction === 'outbound'
-                            ? 'text-blue-100'
-                            : 'text-gray-500'
-                        }`}>
+                        <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
+                        <p className="text-[10px] text-gray-500 mt-1 text-right">
                           {new Date(message.timestamp).toLocaleTimeString('es-ES', { 
                             hour: '2-digit', 
                             minute: '2-digit' 
@@ -652,26 +653,28 @@ const ConversationsPage: React.FC = () => {
               )}
             </div>
 
-            {/* Input Area */}
-            <div className="bg-white border-t border-gray-200 p-4">
-              <div className="flex gap-2 items-end">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600 text-xl"
-                  title="Enviar archivo"
-                >
-                  📎
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-                />
+            {/* Input Area - Estilo WhatsApp */}
+            <div className="bg-[#f0f0f0] p-2 flex gap-2 items-center">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2 hover:bg-gray-200 rounded-full transition text-gray-600"
+                title="Enviar archivo"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={handleFileSelect}
+                className="hidden"
+                accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+              />
+              <div className="flex-1 flex gap-2 bg-white rounded-full px-4 py-2">
                 <input
                   type="text"
-                  placeholder="Escribe un mensaje..."
+                  placeholder="Mensaje"
                   value={replyMessage}
                   onChange={(e) => setReplyMessage(e.target.value)}
                   onKeyDown={(e) => {
@@ -680,24 +683,30 @@ const ConversationsPage: React.FC = () => {
                       handleSendReply();
                     }
                   }}
-                  className="flex-1 px-4 py-2 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                  className="flex-1 bg-transparent focus:outline-none text-sm"
                 />
-                <button
-                  onClick={handleSendReply}
-                  disabled={loading || !replyMessage.trim()}
-                  className="p-2 hover:bg-gray-100 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed text-green-600 text-xl"
-                >
-                  {replyMessage.trim() ? '📤' : '🎤'}
-                </button>
               </div>
+              <button
+                onClick={handleSendReply}
+                disabled={loading || !replyMessage.trim()}
+                className="p-2 bg-[#008069] hover:bg-[#017561] rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed text-white"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
             </div>
           </>
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-500">
+          <div className="flex items-center justify-center h-full text-gray-500 bg-[#f0f0f0]">
             <div className="text-center">
-              <div className="text-6xl mb-4">💬</div>
-              <p className="text-lg">Selecciona una conversación</p>
-              <p className="text-sm mt-2">para ver los mensajes</p>
+              <div className="w-32 h-32 mx-auto mb-4 rounded-full bg-white/50 flex items-center justify-center">
+                <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <p className="text-lg font-medium text-gray-700">WhatsApp Web</p>
+              <p className="text-sm mt-2 text-gray-500">Selecciona un chat para comenzar</p>
             </div>
           </div>
         )}
