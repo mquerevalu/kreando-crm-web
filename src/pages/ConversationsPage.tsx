@@ -96,6 +96,7 @@ const ConversationsPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedConversationRef = useRef<Conversation | null>(null);
   const conversationsListRef = useRef<HTMLDivElement>(null);
+  const lastConversationKeyRef = useRef<string | undefined>(undefined);
 
   // Mantener la referencia actualizada
   useEffect(() => {
@@ -125,7 +126,7 @@ const ConversationsPage: React.FC = () => {
       setLoading(true);
       // Usar pageId en formato whatsapp-{phoneNumberId}
       const pageId = `whatsapp-${selectedCompany.phoneNumberId}`;
-      const keyToUse = append ? lastConversationKey : undefined;
+      const keyToUse = append ? lastConversationKeyRef.current : undefined;
       const result = await conversationService.getConversations(pageId, 500, keyToUse);
       
       if (append) {
@@ -138,12 +139,13 @@ const ConversationsPage: React.FC = () => {
       
       setHasMoreConversations(result.hasMore);
       setLastConversationKey(result.lastKey);
+      lastConversationKeyRef.current = result.lastKey;
     } catch (error) {
       console.error('Error loading conversations:', error);
     } finally {
       setLoading(false);
     }
-  }, [selectedCompany, lastConversationKey]);
+  }, [selectedCompany]);
 
   // Scroll infinito para cargar más conversaciones
   const handleConversationsScroll = useCallback(() => {
