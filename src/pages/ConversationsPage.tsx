@@ -47,6 +47,8 @@ const ConversationsPage: React.FC = () => {
   const [hasMoreConversations, setHasMoreConversations] = useState(false);
   const [lastConversationKey, setLastConversationKey] = useState<string | undefined>(undefined);
   const [showChatInMobile, setShowChatInMobile] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Opciones para los selectores
   const sectorOptions = [
@@ -320,6 +322,8 @@ const ConversationsPage: React.FC = () => {
 
     try {
       setLoading(true);
+      setIsUploading(true);
+      setUploadProgress(0);
       
       // Determinar tipo de archivo
       let fileType = 'document';
@@ -331,15 +335,33 @@ const ConversationsPage: React.FC = () => {
         fileType = 'audio';
       }
 
-      console.log(`Sending ${fileType}: ${file.name}`);
+      console.log(`Sending ${fileType}: ${file.name}, size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
       
-      await conversationService.sendFileBlob(
-        selectedConversation.pageId,
-        selectedConversation.senderId,
-        file,
-        fileType,
-        replyMessage || undefined
-      );
+      // Usar método diferente según el tamaño del archivo
+      const FILE_SIZE_LIMIT = 8 * 1024 * 1024; // 8MB (dejamos margen bajo el límite de 10MB)
+      
+      if (file.size > FILE_SIZE_LIMIT) {
+        console.log('Using large file upload (direct to S3)');
+        // Archivos grandes: subir directamente a S3
+        await conversationService.sendLargeFile(
+          selectedConversation.pageId,
+          selectedConversation.senderId,
+          file,
+          fileType,
+          replyMessage || undefined,
+          (progress) => setUploadProgress(progress)
+        );
+      } else {
+        console.log('Using standard upload (via Lambda)');
+        // Archivos pequeños: método tradicional
+        await conversationService.sendFileBlob(
+          selectedConversation.pageId,
+          selectedConversation.senderId,
+          file,
+          fileType,
+          replyMessage || undefined
+        );
+      }
 
       setReplyMessage('');
       if (fileInputRef.current) {
@@ -357,8 +379,11 @@ const ConversationsPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Error sending file:', error);
+      alert('Error al enviar el archivo. Por favor intenta de nuevo.');
     } finally {
       setLoading(false);
+      setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -689,9 +714,30 @@ const ConversationsPage: React.FC = () => {
 
             {/* Input Area - Estilo WhatsApp */}
             <div className="bg-[#f0f0f0] p-2 flex gap-2 items-center">
+              {/* Indicador de progreso de subida */}
+              {isUploading && (
+                <div className="absolute bottom-16 left-0 right-0 bg-white border-t border-gray-200 p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Subiendo archivo...</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-[#008069] h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2 hover:bg-gray-200 rounded-full transition text-gray-600"
+                disabled={isUploading}
+                className="p-2 hover:bg-gray-200 rounded-full transition text-gray-600 disabled:opacity-50"
                 title="Enviar archivo"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -722,7 +768,7 @@ const ConversationsPage: React.FC = () => {
               </div>
               <button
                 onClick={handleSendReply}
-                disabled={loading || !replyMessage.trim()}
+                disabled={loading || isUploading || !replyMessage.trim()}
                 className="p-2 bg-[#008069] hover:bg-[#017561] rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed text-white"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

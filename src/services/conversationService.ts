@@ -324,4 +324,87 @@ export const conversationService = {
       throw error;
     }
   },
+
+  /**
+   * Obtiene una URL prefirmada para subir archivos grandes directamente a S3
+   */
+  getUploadPresignedUrl: async (
+    pageId: string,
+    senderId: string,
+    fileName: string,
+    fileType: string,
+    contentType: string
+  ): Promise<{ uploadUrl: string; fileKey: string }> => {
+    logApiCall('POST', `/conversations/upload-url`, { fileName, fileType, contentType, pageId, senderId });
+    try {
+      const response = await apiClient.post('/conversations/upload-url', {
+        fileName,
+        fileType,
+        contentType,
+        pageId,
+        senderId,
+      });
+      logApiResponse('POST', `/conversations/upload-url`, response.data);
+      return {
+        uploadUrl: response.data.uploadUrl,
+        fileKey: response.data.fileKey,
+      };
+    } catch (error) {
+      console.warn('API error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Sube un archivo grande directamente a S3 y luego lo envía por WhatsApp
+   */
+  sendLargeFile: async (
+    pageId: string,
+    senderId: string,
+    file: File,
+    fileType: string,
+    caption?: string,
+    onProgress?: (progress: number) => void
+  ): Promise<Message> => {
+    logApiCall('POST', `/conversations/send-large-file`, { fileName: file.name, fileType, caption });
+    try {
+      // 1. Obtener URL prefirmada para subir
+      const { uploadUrl, fileKey } = await conversationService.getUploadPresignedUrl(
+        pageId,
+        senderId,
+        file.name,
+        fileType,
+        file.type
+      );
+
+      // 2. Subir archivo directamente a S3 con seguimiento de progreso
+      await axios.put(uploadUrl, file, {
+        headers: {
+          'Content-Type': file.type,
+        },
+        onUploadProgress: (progressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress(percentCompleted);
+          }
+        },
+      });
+
+      // 3. Notificar al backend que el archivo está listo para enviarse
+      const response = await apiClient.post('/conversations/send-uploaded-file', {
+        pageId,
+        senderId,
+        fileKey,
+        fileType,
+        fileName: file.name,
+        caption,
+      });
+
+      logApiResponse('POST', `/conversations/send-uploaded-file`, response.data);
+      return response.data;
+    } catch (error) {
+      console.warn('API error:', error);
+      throw error;
+    }
+  },
 };
