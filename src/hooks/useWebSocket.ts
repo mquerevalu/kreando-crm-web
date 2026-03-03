@@ -48,6 +48,10 @@ export const useWebSocket = (pageId: string, senderId: string | undefined, onMes
 
       ws.onopen = () => {
         logger.info('✅ WebSocket connected successfully');
+        console.log('✅ WebSocket connected successfully');
+        console.log('Connected to:', wsUrl);
+        console.log('PageId:', pageId);
+        console.log('SenderId:', senderId);
         reconnectAttemptsRef.current = 0;
       };
 
@@ -55,18 +59,24 @@ export const useWebSocket = (pageId: string, senderId: string | undefined, onMes
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           logger.info(`📨 WebSocket message received:`, message);
+          console.log('📨 WebSocket RAW message received:', event.data);
+          console.log('📨 WebSocket PARSED message:', message);
           onMessageRef.current(message);
         } catch (error) {
           logger.error('Error parsing WebSocket message:', error);
+          console.error('❌ Error parsing WebSocket message:', error);
+          console.error('Raw data:', event.data);
         }
       };
 
       ws.onerror = (error) => {
         logger.error('WebSocket error:', error);
+        console.error('❌ WebSocket error:', error);
       };
 
       ws.onclose = (event) => {
         logger.warn(`WebSocket disconnected (code: ${event.code}, reason: ${event.reason})`);
+        console.warn(`⚠️ WebSocket disconnected (code: ${event.code}, reason: ${event.reason})`);
         wsRef.current = null;
 
         // Intentar reconectar

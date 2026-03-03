@@ -153,19 +153,31 @@ const logApiResponse = (method: string, endpoint: string, response: any) => {
 };
 
 export const conversationService = {
-  getConversations: async (pageId: string): Promise<Conversation[]> => {
-    logApiCall('GET', `/conversations?pageId=${pageId}`);
+  getConversations: async (pageId: string, limit: number = 500, lastKey?: string): Promise<{ conversations: Conversation[], hasMore: boolean, lastKey?: string }> => {
+    logApiCall('GET', `/conversations?pageId=${pageId}&limit=${limit}`);
     try {
-      const response = await apiClient.get('/conversations', {
-        params: { pageId },
-      });
-      logApiResponse('GET', `/conversations?pageId=${pageId}`, response.data);
-      return response.data;
+      const params: any = { pageId, limit };
+      if (lastKey) {
+        params.lastKey = lastKey;
+      }
+      
+      const response = await apiClient.get('/conversations', { params });
+      logApiResponse('GET', `/conversations?pageId=${pageId}&limit=${limit}`, response.data);
+      
+      // El backend ahora devuelve { conversations, hasMore, lastKey }
+      return {
+        conversations: response.data.conversations || response.data,
+        hasMore: response.data.hasMore || false,
+        lastKey: response.data.lastKey,
+      };
     } catch (error) {
       console.warn('API error, using mock data:', error);
       await new Promise(resolve => setTimeout(resolve, 500));
-      logApiResponse('GET', `/conversations?pageId=${pageId}`, MOCK_CONVERSATIONS);
-      return MOCK_CONVERSATIONS;
+      logApiResponse('GET', `/conversations?pageId=${pageId}&limit=${limit}`, MOCK_CONVERSATIONS);
+      return {
+        conversations: MOCK_CONVERSATIONS,
+        hasMore: false,
+      };
     }
   },
 

@@ -40,6 +40,8 @@ const ConversationsPage: React.FC = () => {
   const [contactSource, setContactSource] = useState('4');
   const [webhookModalTab, setWebhookModalTab] = useState<'form' | 'questions'>('form');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [hasMoreConversations, setHasMoreConversations] = useState(false);
+  const [lastConversationKey, setLastConversationKey] = useState<string | undefined>(undefined);
 
   // Opciones para los selectores
   const sectorOptions = [
@@ -93,6 +95,7 @@ const ConversationsPage: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedConversationRef = useRef<Conversation | null>(null);
+  const conversationsListRef = useRef<HTMLDivElement>(null);
 
   // Mantener la referencia actualizada
   useEffect(() => {
@@ -115,23 +118,44 @@ const ConversationsPage: React.FC = () => {
     loadCompanies();
   }, []);
 
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async (append: boolean = false) => {
     if (!selectedCompany?.phoneNumberId) return;
 
     try {
       setLoading(true);
       // Usar pageId en formato whatsapp-{phoneNumberId}
       const pageId = `whatsapp-${selectedCompany.phoneNumberId}`;
-      const data = await conversationService.getConversations(pageId);
-      setConversations(data);
-      setSelectedConversation(null);
-      setMessages([]);
+      const keyToUse = append ? lastConversationKey : undefined;
+      const result = await conversationService.getConversations(pageId, 500, keyToUse);
+      
+      if (append) {
+        setConversations(prev => [...prev, ...result.conversations]);
+      } else {
+        setConversations(result.conversations);
+        setSelectedConversation(null);
+        setMessages([]);
+      }
+      
+      setHasMoreConversations(result.hasMore);
+      setLastConversationKey(result.lastKey);
     } catch (error) {
       console.error('Error loading conversations:', error);
     } finally {
       setLoading(false);
     }
-  }, [selectedCompany]);
+  }, [selectedCompany, lastConversationKey]);
+
+  // Scroll infinito para cargar más conversaciones
+  const handleConversationsScroll = useCallback(() => {
+    const element = conversationsListRef.current;
+    if (!element || loading || !hasMoreConversations) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = element;
+    // Cargar más cuando esté a 100px del final
+    if (scrollHeight - scrollTop - clientHeight < 100) {
+      loadConversations(true);
+    }
+  }, [loading, hasMoreConversations, loadConversations]);
 
   // Cargar conversaciones cuando cambia la empresa seleccionada
   useEffect(() => {
@@ -142,9 +166,14 @@ const ConversationsPage: React.FC = () => {
 
   // Manejar mensajes WebSocket
   const handleWebSocketMessage = useCallback((wsMessage: any) => {
+    console.log('🔔 WebSocket message received in ConversationsPage:', wsMessage);
+    console.log('Current selected conversation:', selectedConversationRef.current);
+    
     if (wsMessage.type === 'message') {
+      console.log('📨 Processing message type');
       // Solo agregar el mensaje a la vista si es para la conversación actual
       if (selectedConversationRef.current && wsMessage.senderId === selectedConversationRef.current.senderId) {
+        console.log('✅ Message is for current conversation, adding to messages');
         const newMessage: Message = {
           id: `ws-${Date.now()}`,
           sender: wsMessage.data.direction === 'incoming' ? (wsMessage.data.senderName || 'Usuario') : 'Bot',
@@ -153,8 +182,11 @@ const ConversationsPage: React.FC = () => {
           direction: wsMessage.data.direction === 'incoming' ? 'inbound' : 'outbound',
         };
         setMessages(prev => [...prev, newMessage]);
+      } else {
+        console.log('⚠️ Message is NOT for current conversation or no conversation selected');
       }
     } else if (wsMessage.type === 'conversation_update') {
+      console.log('📋 Processing conversation_update type');
       // Actualizar conversación en la lista
       setConversations(prev => {
         const updated = prev.map(conv => {
@@ -240,8 +272,8 @@ const ConversationsPage: React.FC = () => {
       // Reload conversations to update last message pero mantener la conversación seleccionada
       if (selectedCompany?.phoneNumberId) {
         const pageId = `whatsapp-${selectedCompany.phoneNumberId}`;
-        const conversationsData = await conversationService.getConversations(pageId);
-        setConversations(conversationsData);
+        const result = await conversationService.getConversations(pageId);
+        setConversations(result.conversations);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -288,8 +320,8 @@ const ConversationsPage: React.FC = () => {
       // Reload conversations to update last message pero mantener la conversación seleccionada
       if (selectedCompany?.phoneNumberId) {
         const pageId = `whatsapp-${selectedCompany.phoneNumberId}`;
-        const conversationsData = await conversationService.getConversations(pageId);
-        setConversations(conversationsData);
+        const result = await conversationService.getConversations(pageId);
+        setConversations(result.conversations);
       }
     } catch (error) {
       console.error('Error sending file:', error);
@@ -465,7 +497,11 @@ const ConversationsPage: React.FC = () => {
         </div>
 
         {/* Conversations List */}
-        <div className="flex-1 overflow-y-auto">
+        <div 
+          ref={conversationsListRef}
+          onScroll={handleConversationsScroll}
+          className="flex-1 overflow-y-auto"
+        >
           {loading && filteredConversations.length === 0 ? (
             <div className="p-4 text-center text-gray-500">Cargando...</div>
           ) : filteredConversations.length === 0 ? (
@@ -508,6 +544,11 @@ const ConversationsPage: React.FC = () => {
                 </div>
               </button>
             ))
+          )}
+          {loading && filteredConversations.length > 0 && (
+            <div className="p-4 text-center text-gray-500 text-sm">
+              Cargando más conversaciones...
+            </div>
           )}
         </div>
       </div>
