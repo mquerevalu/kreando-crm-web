@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { conversationService } from '../services/conversationService';
 import { companyService, Company } from '../services/companyService';
 import { useWebSocket } from '../hooks/useWebSocket';
+import MediaViewer from '../components/MediaViewer';
 
 interface Conversation {
   id: string;
@@ -24,6 +25,9 @@ interface Message {
   content: string;
   timestamp: string;
   direction: 'inbound' | 'outbound';
+  s3Key?: string;
+  mediaType?: string;
+  mediaFileName?: string;
 }
 
 const ConversationsPage: React.FC = () => {
@@ -654,6 +658,17 @@ const ConversationsPage: React.FC = () => {
                             : 'bg-white text-gray-900'
                         }`}
                       >
+                        {/* Renderizar multimedia si existe */}
+                        {message.s3Key && message.mediaType && (
+                          <MediaViewer
+                            s3Key={message.s3Key}
+                            mediaType={message.mediaType}
+                            mediaFileName={message.mediaFileName}
+                            direction={message.direction}
+                          />
+                        )}
+                        
+                        {/* Texto del mensaje */}
                         <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
                         <p className="text-[10px] text-gray-500 mt-1 text-right">
                           {new Date(message.timestamp).toLocaleTimeString('es-ES', { 

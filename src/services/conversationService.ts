@@ -310,4 +310,18 @@ export const conversationService = {
       throw error;
     }
   },
+
+  getMediaPresignedUrl: async (s3Key: string, expiresIn: number = 3600): Promise<string> => {
+    logApiCall('GET', `/conversations/media-url?s3Key=${s3Key}&expiresIn=${expiresIn}`);
+    try {
+      const response = await apiClient.get('/conversations/media-url', {
+        params: { s3Key, expiresIn },
+      });
+      logApiResponse('GET', `/conversations/media-url`, response.data);
+      return response.data.url;
+    } catch (error) {
+      console.warn('API error:', error);
+      throw error;
+    }
+  },
 };
