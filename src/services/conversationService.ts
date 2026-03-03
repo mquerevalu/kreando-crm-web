@@ -285,4 +285,17 @@ export const conversationService = {
       throw error;
     }
   },
+
+  markAsCrmIntegrated: async (pageId: string, senderId: string): Promise<void> => {
+    logApiCall('PUT', `/conversations/crm-integrated?pageId=${pageId}&senderId=${senderId}`);
+    try {
+      const response = await apiClient.put('/conversations/crm-integrated', {}, {
+        params: { pageId, senderId },
+      });
+      logApiResponse('PUT', `/conversations/crm-integrated`, response.data);
+    } catch (error) {
+      console.warn('API error:', error);
+      throw error;
+    }
+  },
 };

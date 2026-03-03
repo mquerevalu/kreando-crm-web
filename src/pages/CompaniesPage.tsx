@@ -102,6 +102,7 @@ const CompaniesPage: React.FC = () => {
         wspNumberId: editingCompany.wspNumberId,
         accountId: editingCompany.accountId,
         pineconeNamespaces: (editingCompany as any).pineconeNamespaces,
+        mensajeDefault: (editingCompany as any).mensajeDefault,
         ...(activeTab === 'flow' && { flujoBot: flowSteps as any }),
       };
 
@@ -304,6 +305,24 @@ const CompaniesPage: React.FC = () => {
                       rows={5}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                  </div>
+
+                  {/* Mensaje Default */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Mensaje por Defecto
+                      <span className="text-xs text-gray-500 font-normal ml-2">(cuando el agente está desactivado)</span>
+                    </label>
+                    <textarea
+                      value={(editingCompany as any).mensajeDefault || ''}
+                      onChange={(e) => handleInputChange('mensajeDefault' as any, e.target.value)}
+                      rows={3}
+                      placeholder="Gracias por tu información. Un agente se comunicará contigo pronto."
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 Este mensaje se enviará automáticamente cuando el agente esté desactivado.
+                    </p>
                   </div>
 
                   {/* Pinecone Namespaces */}

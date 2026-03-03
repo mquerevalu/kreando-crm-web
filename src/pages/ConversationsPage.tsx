@@ -13,6 +13,9 @@ interface Conversation {
   lastMessage: string;
   lastMessageTime: string;
   status: 'active' | 'archived' | 'completed';
+  unreadCount?: number;
+  updatedAt?: number;
+  crmIntegrated?: boolean;
 }
 
 interface Message {
@@ -154,11 +157,31 @@ const ConversationsPage: React.FC = () => {
     } else if (wsMessage.type === 'conversation_update') {
       // Actualizar conversación en la lista
       setConversations(prev => {
-        const updated = prev.map(conv =>
-          conv.senderId === wsMessage.senderId
-            ? { ...conv, lastMessage: wsMessage.data.lastMessage, lastMessageTime: new Date(wsMessage.data.updatedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) }
-            : conv
-        );
+        const updated = prev.map(conv => {
+          if (conv.senderId === wsMessage.senderId) {
+            // Si es un mensaje entrante y NO es la conversación seleccionada, incrementar unreadCount
+            const isIncomingMessage = wsMessage.data.direction === 'incoming';
+            const isSelectedConversation = selectedConversationRef.current?.senderId === wsMessage.senderId;
+            
+            return {
+              ...conv,
+              lastMessage: wsMessage.data.lastMessage,
+              lastMessageTime: new Date(wsMessage.data.updatedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+              unreadCount: isIncomingMessage && !isSelectedConversation 
+                ? (conv.unreadCount || 0) + 1 
+                : conv.unreadCount,
+              updatedAt: wsMessage.data.updatedAt // Actualizar timestamp para ordenamiento
+            };
+          }
+          return conv;
+        });
+        
+        // Reordenar: mover la conversación actualizada al principio
+        const sortedConversations = updated.sort((a, b) => {
+          const aTime = a.updatedAt || 0;
+          const bTime = b.updatedAt || 0;
+          return bTime - aTime;
+        });
         
         // Si la conversación no existe en la lista, recargar todas las conversaciones
         const conversationExists = updated.some(conv => conv.senderId === wsMessage.senderId);
@@ -167,7 +190,7 @@ const ConversationsPage: React.FC = () => {
           loadConversations();
         }
         
-        return updated;
+        return sortedConversations;
       });
     }
   }, [loadConversations]);
@@ -188,6 +211,17 @@ const ConversationsPage: React.FC = () => {
     try {
       const data = await conversationService.getMessages(conversation.pageId, conversation.senderId);
       setMessages(data);
+      
+      // Resetear el contador de mensajes no leídos
+      if (conversation.unreadCount && conversation.unreadCount > 0) {
+        await conversationService.markAsRead(conversation.pageId, conversation.senderId);
+        // Actualizar la conversación en la lista local
+        setConversations(prev => prev.map(conv =>
+          conv.senderId === conversation.senderId
+            ? { ...conv, unreadCount: 0 }
+            : conv
+        ));
+      }
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -307,14 +341,22 @@ const ConversationsPage: React.FC = () => {
       .map((qa: any) => qa.answer)
       .join(' | ');
     
+    // Agregar fecha actual al inicio de la descripción (formato: DD-MM-YYYY)
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    const currentDate = `${day}-${month}-${year}`;
+    const descripcionConFecha = `${currentDate} | ${clientResponses}`;
+    
     const dataToSend = {
       phoneNumber: selectedConversation?.phoneNumber,
       participantName: selectedConversation?.participantName || 'Sin nombre',
       questionsAnswers: questionsAnswers,
       contactSource: contactSource,
-      sector: '25', // Valor por defecto
+      sector: '50', // Valor por defecto: Lavandería Comercial
       condicion: '20', // Valor por defecto
-      descripcion: clientResponses,
+      descripcion: descripcionConFecha,
       timestamp: new Date().toISOString(),
     };
 
@@ -323,7 +365,7 @@ const ConversationsPage: React.FC = () => {
   };
 
   const handleSendToWebhook = async () => {
-    if (!webhookData || !selectedCompany?.urlWebHook) return;
+    if (!webhookData || !selectedCompany?.urlWebHook || !selectedConversation) return;
 
     try {
       setLoading(true);
@@ -348,6 +390,20 @@ const ConversationsPage: React.FC = () => {
       };
       
       await conversationService.sendToWebhook(selectedCompany.urlWebHook, transformedData);
+      
+      // Marcar la conversación como integrada con CRM
+      await conversationService.markAsCrmIntegrated(selectedConversation.pageId, selectedConversation.senderId);
+      
+      // Actualizar la conversación en la lista local
+      setConversations(prev => prev.map(conv =>
+        conv.senderId === selectedConversation.senderId
+          ? { ...conv, crmIntegrated: true }
+          : conv
+      ));
+      
+      // Actualizar la conversación seleccionada
+      setSelectedConversation(prev => prev ? { ...prev, crmIntegrated: true } : null);
+      
       setSuccessMessage('✓ Datos enviados al webhook correctamente');
       setShowWebhookModal(false);
       setWebhookData(null);
@@ -434,12 +490,21 @@ const ConversationsPage: React.FC = () => {
                 {/* Conversation Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline">
-                    <p className="font-semibold text-gray-900 truncate">
+                    <p className={`truncate ${conversation.unreadCount && conversation.unreadCount > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-900'}`}>
                       {conversation.participantName || conversation.phoneNumber}
                     </p>
-                    <p className="text-xs text-gray-500 ml-2 flex-shrink-0">{conversation.lastMessageTime}</p>
+                    <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                      <p className="text-xs text-gray-500">{conversation.lastMessageTime}</p>
+                      {conversation.unreadCount && conversation.unreadCount > 0 && (
+                        <span className="bg-green-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                          {conversation.unreadCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-600 truncate">{conversation.lastMessage}</p>
+                  <p className={`text-sm truncate ${conversation.unreadCount && conversation.unreadCount > 0 ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
+                    {conversation.lastMessage}
+                  </p>
                 </div>
               </button>
             ))
@@ -458,9 +523,16 @@ const ConversationsPage: React.FC = () => {
                   {(selectedConversation.participantName || selectedConversation.phoneNumber).charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {selectedConversation.participantName || 'Usuario'}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {selectedConversation.participantName || 'Usuario'}
+                    </h3>
+                    {selectedConversation.crmIntegrated && (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                        ✓ Integrado con CRM
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 mt-1">
                     <p className="text-xs text-gray-500">En línea</p>
                     <span className="text-xs text-gray-400">•</span>
@@ -480,9 +552,9 @@ const ConversationsPage: React.FC = () => {
               <div className="flex gap-2">
                 <button 
                   onClick={handleOpenWebhookModal}
-                  disabled={loading || !selectedCompany?.urlWebHook}
+                  disabled={loading || !selectedCompany?.urlWebHook || selectedConversation.crmIntegrated}
                   className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Enviar a webhook"
+                  title={selectedConversation.crmIntegrated ? "Ya integrado con CRM" : "Enviar a webhook"}
                 >
                   🔗
                 </button>
