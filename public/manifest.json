@@ -1,0 +1,24 @@
+{
+  "short_name": "KS Agente",
+  "name": "KS Agente WhatsApp API",
+  "description": "Gestión de conversaciones de WhatsApp",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/conversations",
+  "display": "standalone",
+  "theme_color": "#008069",
+  "background_color": "#ffffff",
+  "orientation": "portrait"
+}

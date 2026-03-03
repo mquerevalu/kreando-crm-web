@@ -98,6 +98,7 @@ const ConversationsPage: React.FC = () => {
   const selectedConversationRef = useRef<Conversation | null>(null);
   const conversationsListRef = useRef<HTMLDivElement>(null);
   const lastConversationKeyRef = useRef<string | undefined>(undefined);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Mantener la referencia actualizada
   useEffect(() => {
@@ -148,21 +149,36 @@ const ConversationsPage: React.FC = () => {
     }
   }, [selectedCompany]);
 
-  // Scroll infinito para cargar más conversaciones
+  // Scroll infinito para cargar más conversaciones con debounce
   const handleConversationsScroll = useCallback(() => {
     const element = conversationsListRef.current;
     if (!element || loading || !hasMoreConversations) return;
 
-    const { scrollTop, scrollHeight, clientHeight } = element;
-    // Cargar más cuando esté a 100px del final
-    if (scrollHeight - scrollTop - clientHeight < 100) {
-      loadConversations(true);
+    // Limpiar timeout anterior
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
     }
+
+    // Debounce de 150ms
+    scrollTimeoutRef.current = setTimeout(() => {
+      const { scrollTop, scrollHeight, clientHeight } = element;
+      // Cargar más cuando esté a 200px del final (más anticipado)
+      if (scrollHeight - scrollTop - clientHeight < 200) {
+        loadConversations(true);
+      }
+    }, 150);
   }, [loading, hasMoreConversations, loadConversations]);
 
   // Cargar conversaciones cuando cambia la empresa seleccionada
   useEffect(() => {
     loadConversations();
+    
+    // Cleanup del timeout al desmontar
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
   }, [loadConversations]);
 
   const pageId = selectedCompany ? `whatsapp-${selectedCompany.phoneNumberId}` : '';
