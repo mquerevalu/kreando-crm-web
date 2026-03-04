@@ -71,6 +71,18 @@ export const companyService = {
     }
   },
 
+  createCompany: async (data: Omit<Company, 'fechaCreacion' | 'fechaActualizacion'>): Promise<Company> => {
+    logApiCall('POST', '/companies', data);
+    try {
+      const response = await apiClient.post('/companies', data);
+      logApiResponse('POST', '/companies', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating company:', error);
+      throw error;
+    }
+  },
+
   updateCompany: async (configId: string, data: Partial<Company>): Promise<Company> => {
     logApiCall('PUT', `/companies/${configId}`, data);
     try {

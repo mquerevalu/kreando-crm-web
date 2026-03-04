@@ -36,6 +36,13 @@ const CompaniesPage: React.FC = () => {
   const [flowSteps, setFlowSteps] = useState<FlowStep[]>([]);
   const [showFlowModal, setShowFlowModal] = useState(false);
   const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newCompany, setNewCompany] = useState<Partial<Company>>({
+    agentActive: true,
+    estado: 'active',
+    prompt: '',
+    urlWebHook: '',
+  });
 
   const loadCompanies = useCallback(async () => {
     try {
@@ -156,14 +163,71 @@ const CompaniesPage: React.FC = () => {
     }
   };
 
+  const handleCreateCompany = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Validar campos requeridos
+      if (!newCompany.configId || !newCompany.nombreEmpresa || !newCompany.phoneNumberId || 
+          !newCompany.wspNumberId || !newCompany.accessToken || !newCompany.accountId) {
+        setError('Todos los campos marcados con * son requeridos');
+        setLoading(false);
+        return;
+      }
+
+      const created = await companyService.createCompany(newCompany as Omit<Company, 'fechaCreacion' | 'fechaActualizacion'>);
+      
+      // Agregar a la lista
+      setCompanies(prev => [...prev, created]);
+      
+      // Seleccionar la nueva empresa
+      setSelectedCompany(created);
+      setEditingCompany(created);
+      setFlowSteps([]);
+      
+      // Cerrar modal y limpiar formulario
+      setShowCreateModal(false);
+      setNewCompany({
+        agentActive: true,
+        estado: 'active',
+        prompt: '',
+        urlWebHook: '',
+      });
+      
+      setSuccessMessage('Agente creado correctamente');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      if (err.response?.status === 409) {
+        setError('Ya existe un agente con ese ID');
+      } else {
+        setError('Error al crear el agente');
+      }
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex h-full bg-gray-100">
       {/* Companies List */}
       <div className="w-80 bg-white flex flex-col border-r border-gray-200 shadow-sm">
         {/* Header */}
         <div className="bg-gradient-to-b from-slate-900 to-slate-800 text-white p-6">
-          <h1 className="text-2xl font-bold">🤖 Agentes</h1>
-          <p className="text-slate-300 text-sm mt-1">Gestión de agentes</p>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-2xl font-bold">🤖 Agentes</h1>
+            {user?.role === 'administrador' && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm font-semibold transition"
+                title="Crear nuevo agente"
+              >
+                + Nuevo
+              </button>
+            )}
+          </div>
+          <p className="text-slate-300 text-sm">Gestión de agentes</p>
         </div>
 
         {/* Companies List */}
@@ -520,6 +584,156 @@ const CompaniesPage: React.FC = () => {
           companyId={selectedCompany.configId}
           companyName={selectedCompany.nombreEmpresa}
         />
+      )}
+
+      {/* Create Company Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-t-lg">
+              <h2 className="text-2xl font-bold">Crear Nuevo Agente</h2>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Config ID *</label>
+                <input
+                  type="text"
+                  value={newCompany.configId || ''}
+                  onChange={(e) => setNewCompany({ ...newCompany, configId: e.target.value })}
+                  placeholder="empresa-abc"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre de la Empresa *</label>
+                <input
+                  type="text"
+                  value={newCompany.nombreEmpresa || ''}
+                  onChange={(e) => setNewCompany({ ...newCompany, nombreEmpresa: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number ID *</label>
+                <input
+                  type="text"
+                  value={newCompany.phoneNumberId || ''}
+                  onChange={(e) => setNewCompany({ ...newCompany, phoneNumberId: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">WSP Number ID *</label>
+                <input
+                  type="text"
+                  value={newCompany.wspNumberId || ''}
+                  onChange={(e) => setNewCompany({ ...newCompany, wspNumberId: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Access Token *</label>
+                <textarea
+                  value={newCompany.accessToken || ''}
+                  onChange={(e) => setNewCompany({ ...newCompany, accessToken: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Account ID *</label>
+                <input
+                  type="text"
+                  value={newCompany.accountId || ''}
+                  onChange={(e) => setNewCompany({ ...newCompany, accountId: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Prompt del Agente</label>
+                <textarea
+                  value={newCompany.prompt || ''}
+                  onChange={(e) => setNewCompany({ ...newCompany, prompt: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">URL WebHook</label>
+                <input
+                  type="text"
+                  value={newCompany.urlWebHook || ''}
+                  onChange={(e) => setNewCompany({ ...newCompany, urlWebHook: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newCompany.agentActive || false}
+                    onChange={(e) => setNewCompany({ ...newCompany, agentActive: e.target.checked })}
+                    className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-semibold text-gray-700">Agente Activo</span>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Estado</label>
+                <select
+                  value={newCompany.estado || 'active'}
+                  onChange={(e) => setNewCompany({ ...newCompany, estado: e.target.value as 'active' | 'inactive' })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="active">Activa</option>
+                  <option value="inactive">Inactiva</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex gap-3 justify-end rounded-b-lg border-t">
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setNewCompany({
+                    agentActive: true,
+                    estado: 'active',
+                    prompt: '',
+                    urlWebHook: '',
+                  });
+                  setError(null);
+                }}
+                disabled={loading}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateCompany}
+                disabled={loading}
+                className="px-6 py-2 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-lg font-semibold hover:shadow-lg transition disabled:opacity-50"
+              >
+                {loading ? 'Creando...' : 'Crear Agente'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

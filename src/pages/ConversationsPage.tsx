@@ -416,10 +416,13 @@ const ConversationsPage: React.FC = () => {
   const handleSendReply = async () => {
     if (!selectedConversation || !replyMessage.trim()) return;
 
+    // Guardar el mensaje y limpiar el campo inmediatamente para evitar doble envío
+    const messageToSend = replyMessage.trim();
+    setReplyMessage('');
+
     try {
       setLoading(true);
-      await conversationService.sendMessage(selectedConversation.pageId, selectedConversation.senderId, replyMessage);
-      setReplyMessage('');
+      await conversationService.sendMessage(selectedConversation.pageId, selectedConversation.senderId, messageToSend);
       // Reload messages
       const data = await conversationService.getMessages(selectedConversation.pageId, selectedConversation.senderId);
       setMessages(data);
