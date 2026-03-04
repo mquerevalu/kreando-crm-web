@@ -113,6 +113,7 @@ const CompaniesPage: React.FC = () => {
         wspNumberId: editingCompany.wspNumberId,
         accountId: editingCompany.accountId,
         pineconeNamespaces: (editingCompany as any).pineconeNamespaces,
+        pineconeApiKey: (editingCompany as any).pineconeApiKey,
         mensajeDefault: (editingCompany as any).mensajeDefault,
         ...(activeTab === 'flow' && { flujoBot: flowSteps as any }),
       };
@@ -365,6 +366,24 @@ const CompaniesPage: React.FC = () => {
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       💡 Deja vacío para usar "default". Usa comas para múltiples namespaces.
+                    </p>
+                  </div>
+
+                  {/* Pinecone API Key */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Pinecone API Key
+                      <span className="text-xs text-gray-500 font-normal ml-2">(opcional - usa la del Lambda si está vacío)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={(editingCompany as any).pineconeApiKey || ''}
+                      onChange={(e) => handleInputChange('pineconeApiKey' as any, e.target.value)}
+                      placeholder="pcsk_..."
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      🔐 API Key específica de Pinecone para esta empresa. Si está vacío, se usará la configurada en el Lambda.
                     </p>
                   </div>
 

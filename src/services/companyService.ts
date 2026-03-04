@@ -28,6 +28,7 @@ export interface Company {
   urlWebHook: string;
   mensajeDefault?: string;
   pineconeNamespaces?: string | string[];
+  pineconeApiKey?: string;
   fechaCreacion: number;
   fechaActualizacion: number;
   flujoBot?: any[];
