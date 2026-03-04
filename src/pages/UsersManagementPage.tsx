@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useUserStore } from '../store/userStore';
 import { userService, User, UserRole } from '../services/userService';
 import { companyService, Company } from '../services/companyService';
+import ConfirmDialog from '../components/ConfirmDialog';
+import AlertDialog from '../components/AlertDialog';
 
 const UsersManagementPage: React.FC = () => {
   const { isAdmin } = useUserStore();
@@ -28,6 +30,31 @@ const UsersManagementPage: React.FC = () => {
   });
 
   const [showEditModal, setShowEditModal] = useState(false);
+  
+  // Estados para diálogos
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+  
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'error' | 'warning' | 'info' | 'success';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     if (isAdmin()) {
@@ -58,7 +85,12 @@ const UsersManagementPage: React.FC = () => {
     e.preventDefault();
     
     if (!formData.password) {
-      alert('La contraseña es requerida para crear un usuario');
+      setAlertDialog({
+        isOpen: true,
+        title: 'Error',
+        message: 'La contraseña es requerida para crear un usuario',
+        type: 'error',
+      });
       return;
     }
     
@@ -73,10 +105,20 @@ const UsersManagementPage: React.FC = () => {
       setShowCreateModal(false);
       setFormData({ userId: '', email: '', name: '', role: 'asesor', password: '' });
       loadUsers();
-      alert('Usuario creado exitosamente');
+      setAlertDialog({
+        isOpen: true,
+        title: 'Éxito',
+        message: 'Usuario creado exitosamente',
+        type: 'success',
+      });
     } catch (error) {
       console.error('Error creating user:', error);
-      alert('Error al crear usuario');
+      setAlertDialog({
+        isOpen: true,
+        title: 'Error',
+        message: 'Error al crear usuario',
+        type: 'error',
+      });
     }
   };
 
@@ -100,10 +142,20 @@ const UsersManagementPage: React.FC = () => {
       setSelectedUser(null);
       setEditFormData({ name: '', email: '', role: 'asesor', password: '' });
       loadUsers();
-      alert('Usuario actualizado exitosamente');
+      setAlertDialog({
+        isOpen: true,
+        title: 'Éxito',
+        message: 'Usuario actualizado exitosamente',
+        type: 'success',
+      });
     } catch (error) {
       console.error('Error updating user:', error);
-      alert('Error al actualizar usuario');
+      setAlertDialog({
+        isOpen: true,
+        title: 'Error',
+        message: 'Error al actualizar usuario',
+        type: 'error',
+      });
     }
   };
 
@@ -121,20 +173,55 @@ const UsersManagementPage: React.FC = () => {
     try {
       await userService.assignCompany(selectedUser.userId, configId);
       loadUsers();
-      alert('Empresa asignada correctamente');
+      setAlertDialog({
+        isOpen: true,
+        title: 'Éxito',
+        message: 'Empresa asignada correctamente',
+        type: 'success',
+      });
     } catch (error) {
       console.error('Error assigning company:', error);
-      alert('Error al asignar empresa');
+      setAlertDialog({
+        isOpen: true,
+        title: 'Error',
+        message: 'Error al asignar empresa',
+        type: 'error',
+      });
     }
   };
 
   const handleUnassignCompany = async (userId: string, configId: string) => {
-    try {
-      await userService.unassignCompany(userId, configId);
-      loadUsers();
-    } catch (error) {
-      console.error('Error unassigning company:', error);
-    }
+    const company = companies.find(c => c.configId === configId);
+    const user = users.find(u => u.userId === userId);
+    
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Desasignar empresa',
+      message: `¿Desasignar la empresa "${company?.nombreEmpresa}" de ${user?.name}?`,
+      type: 'warning',
+      onConfirm: async () => {
+        try {
+          await userService.unassignCompany(userId, configId);
+          loadUsers();
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          setAlertDialog({
+            isOpen: true,
+            title: 'Éxito',
+            message: 'Empresa desasignada correctamente',
+            type: 'success',
+          });
+        } catch (error) {
+          console.error('Error unassigning company:', error);
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          setAlertDialog({
+            isOpen: true,
+            title: 'Error',
+            message: 'Error al desasignar empresa',
+            type: 'error',
+          });
+        }
+      },
+    });
   };
 
   if (!isAdmin()) {
@@ -365,33 +452,73 @@ const UsersManagementPage: React.FC = () => {
         {/* Assign Company Modal */}
         {showAssignCompanyModal && selectedUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h2 className="text-2xl font-bold mb-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-2">
                 Asignar Empresa a {selectedUser.name}
               </h2>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {companies.map((company) => {
-                  const isAssigned = selectedUser.assignedCompanies?.includes(company.configId);
-                  return (
-                    <button
-                      key={company.configId}
-                      onClick={() => !isAssigned && handleAssignCompany(company.configId)}
-                      disabled={isAssigned}
-                      className={`w-full text-left px-4 py-3 rounded-lg border transition ${
-                        isAssigned
-                          ? 'bg-gray-100 border-gray-300 cursor-not-allowed'
-                          : 'bg-white border-gray-200 hover:bg-blue-50 hover:border-blue-300'
-                      }`}
-                    >
-                      <div className="font-medium">{company.nombreEmpresa}</div>
-                      <div className="text-sm text-gray-500">{company.configId}</div>
-                      {isAssigned && (
-                        <div className="text-xs text-green-600 mt-1">✓ Ya asignada</div>
-                      )}
-                    </button>
-                  );
-                })}
+              <p className="text-sm text-gray-600 mb-4">
+                {selectedUser.assignedCompanies?.length || 0} empresa(s) asignada(s)
+              </p>
+              
+              {/* Empresas asignadas */}
+              {selectedUser.assignedCompanies && selectedUser.assignedCompanies.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                    ✓ Empresas Asignadas
+                  </h3>
+                  <div className="space-y-2">
+                    {companies
+                      .filter(company => selectedUser.assignedCompanies?.includes(company.configId))
+                      .map((company) => (
+                        <div
+                          key={company.configId}
+                          className="px-4 py-3 rounded-lg border-2 border-green-300 bg-green-50"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{company.nombreEmpresa}</div>
+                              <div className="text-sm text-gray-600">{company.configId}</div>
+                            </div>
+                            <button
+                              onClick={() => handleUnassignCompany(selectedUser.userId, company.configId)}
+                              className="ml-2 text-red-600 hover:text-red-800 font-medium text-sm"
+                              title="Desasignar empresa"
+                            >
+                              🗑️ Quitar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Empresas disponibles */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                  Empresas Disponibles
+                </h3>
+                <div className="space-y-2">
+                  {companies
+                    .filter(company => !selectedUser.assignedCompanies?.includes(company.configId))
+                    .map((company) => (
+                      <button
+                        key={company.configId}
+                        onClick={() => handleAssignCompany(company.configId)}
+                        className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 bg-white hover:bg-blue-50 hover:border-blue-300 transition"
+                      >
+                        <div className="font-medium text-gray-900">{company.nombreEmpresa}</div>
+                        <div className="text-sm text-gray-500">{company.configId}</div>
+                      </button>
+                    ))}
+                  {companies.filter(company => !selectedUser.assignedCompanies?.includes(company.configId)).length === 0 && (
+                    <p className="text-center text-gray-500 py-4 text-sm">
+                      Todas las empresas ya están asignadas
+                    </p>
+                  )}
+                </div>
               </div>
+              
               <button
                 onClick={() => {
                   setShowAssignCompanyModal(false);
@@ -484,6 +611,25 @@ const UsersManagementPage: React.FC = () => {
             </div>
           </div>
         )}
+        
+        {/* Confirm Dialog */}
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          type={confirmDialog.type}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        />
+        
+        {/* Alert Dialog */}
+        <AlertDialog
+          isOpen={alertDialog.isOpen}
+          title={alertDialog.title}
+          message={alertDialog.message}
+          type={alertDialog.type}
+          onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        />
       </div>
     </div>
   );

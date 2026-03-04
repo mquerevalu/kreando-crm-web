@@ -12,7 +12,7 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     try {
       await login(username, password);
-      navigate('/dashboard');
+      navigate('/conversations');
     } catch (error) {
       // Error ya está en el store
     }
