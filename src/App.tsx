@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import WorkflowBuilderPage from './pages/WorkflowBuilderPage';
 import ConversationsPage from './pages/ConversationsPage';
+import ConversationBoardPage from './pages/ConversationBoardPage';
 import CompaniesPage from './pages/CompaniesPage';
 import UsersManagementPage from './pages/UsersManagementPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -47,6 +48,7 @@ function App() {
                     <Route path="/workflows" element={<WorkflowBuilderPage />} />
                     <Route path="/workflows/:id" element={<WorkflowBuilderPage />} />
                     <Route path="/conversations" element={<ConversationsPage />} />
+                    <Route path="/board" element={<ConversationBoardPage />} />
                     <Route path="/companies" element={<CompaniesPage />} />
                     <Route path="/users" element={<UsersManagementPage />} />
                     <Route path="/" element={<Navigate to="/conversations" replace />} />

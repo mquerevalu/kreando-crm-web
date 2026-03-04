@@ -7,6 +7,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import MediaViewer from '../components/MediaViewer';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AlertDialog from '../components/AlertDialog';
+import { useSearchParams } from 'react-router-dom';
 
 interface Conversation {
   id: string;
@@ -37,6 +38,7 @@ interface Message {
 
 const ConversationsPage: React.FC = () => {
   const { user, canAccessCompany, canAccessConversation } = useUserStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -58,6 +60,9 @@ const ConversationsPage: React.FC = () => {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [advisors, setAdvisors] = useState<User[]>([]);
   const [currentAssignment, setCurrentAssignment] = useState<any>(null);
+  
+  // Ref para controlar si ya se seleccionó una conversación desde URL
+  const hasAutoSelectedRef = useRef(false);
   
   // Estados para diálogos
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -270,6 +275,33 @@ const ConversationsPage: React.FC = () => {
       }
     };
   }, [loadConversations]);
+
+  // Seleccionar conversación automáticamente desde URL (solo una vez)
+  useEffect(() => {
+    // Si ya se seleccionó, no hacer nada
+    if (hasAutoSelectedRef.current) return;
+    
+    const pageIdParam = searchParams.get('pageId');
+    const senderIdParam = searchParams.get('senderId');
+    
+    if (pageIdParam && senderIdParam && conversations.length > 0 && !selectedConversation) {
+      // Buscar la conversación que coincida
+      const targetConversation = conversations.find(
+        conv => conv.pageId === pageIdParam && conv.senderId === senderIdParam
+      );
+      
+      if (targetConversation) {
+        console.log('🎯 Auto-selecting conversation from URL:', targetConversation);
+        hasAutoSelectedRef.current = true; // Marcar como seleccionado
+        handleSelectConversation(targetConversation);
+        
+        // Limpiar los parámetros de la URL después de seleccionar
+        setTimeout(() => {
+          setSearchParams({});
+        }, 100);
+      }
+    }
+  }, [conversations, searchParams, selectedConversation]);
 
   const pageId = selectedCompany ? `whatsapp-${selectedCompany.phoneNumberId}` : '';
 

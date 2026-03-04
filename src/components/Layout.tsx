@@ -51,6 +51,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           >
             {sidebarOpen ? '💬 Conversaciones' : '💬'}
           </button>
+          <button
+            onClick={() => navigate('/board')}
+            className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-700 text-gray-300 hover:text-white transition font-medium text-sm"
+          >
+            {sidebarOpen ? '📋 Tablero' : '📋'}
+          </button>
           {!isAdvisor() && (
             <button
               onClick={() => navigate('/companies')}
