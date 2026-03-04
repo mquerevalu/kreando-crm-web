@@ -17,6 +17,7 @@ interface Conversation {
   unreadCount?: number;
   updatedAt?: number;
   crmIntegrated?: boolean;
+  agentEnabled?: boolean;
 }
 
 interface Message {
@@ -291,6 +292,37 @@ const ConversationsPage: React.FC = () => {
   const handleBackToConversations = () => {
     setShowChatInMobile(false);
     setSelectedConversation(null);
+  };
+
+  const handleToggleAgent = async () => {
+    if (!selectedConversation) return;
+
+    try {
+      const newAgentEnabled = await conversationService.toggleAgent(
+        selectedConversation.pageId,
+        selectedConversation.senderId
+      );
+
+      // Actualizar el estado local
+      setSelectedConversation({
+        ...selectedConversation,
+        agentEnabled: newAgentEnabled,
+      });
+
+      // Actualizar también en la lista de conversaciones
+      setConversations(prevConversations =>
+        prevConversations.map(conv =>
+          conv.senderId === selectedConversation.senderId && conv.pageId === selectedConversation.pageId
+            ? { ...conv, agentEnabled: newAgentEnabled }
+            : conv
+        )
+      );
+
+      console.log(`Agent ${newAgentEnabled ? 'enabled' : 'disabled'} for conversation`);
+    } catch (error) {
+      console.error('Error toggling agent:', error);
+      alert('Error al cambiar el estado del agente');
+    }
   };
 
   const handleSendReply = async () => {
@@ -638,7 +670,25 @@ const ConversationsPage: React.FC = () => {
               </div>
               
               {/* Acciones */}
-              <div className="flex gap-1">
+              <div className="flex gap-2 items-center">
+                {/* Toggle del agente */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-white/90 hidden sm:inline">Agente</span>
+                  <button
+                    onClick={handleToggleAgent}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 ${
+                      selectedConversation.agentEnabled !== false ? 'bg-green-500' : 'bg-gray-400'
+                    }`}
+                    title={selectedConversation.agentEnabled !== false ? 'Agente activado' : 'Agente desactivado'}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        selectedConversation.agentEnabled !== false ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
                 {selectedConversation.crmIntegrated && (
                   <span className="hidden md:inline-flex px-2 py-1 bg-white/20 text-white text-xs rounded-full">
                     ✓ CRM

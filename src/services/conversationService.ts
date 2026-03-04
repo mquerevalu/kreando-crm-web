@@ -24,6 +24,7 @@ interface Conversation {
   lastMessage: string;
   lastMessageTime: string;
   status: 'active' | 'archived' | 'completed';
+  agentEnabled?: boolean;
 }
 
 interface Message {
@@ -402,6 +403,21 @@ export const conversationService = {
 
       logApiResponse('POST', `/conversations/send-uploaded-file`, response.data);
       return response.data;
+    } catch (error) {
+      console.warn('API error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Alterna el estado del agente para una conversación específica
+   */
+  toggleAgent: async (pageId: string, senderId: string): Promise<boolean> => {
+    logApiCall('PUT', `/conversations/${pageId}/${senderId}/agent-toggle`);
+    try {
+      const response = await apiClient.put(`/conversations/${pageId}/${senderId}/agent-toggle`);
+      logApiResponse('PUT', `/conversations/${pageId}/${senderId}/agent-toggle`, response.data);
+      return response.data.agentEnabled;
     } catch (error) {
       console.warn('API error:', error);
       throw error;
