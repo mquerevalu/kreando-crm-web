@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { companyService, Company } from '../services/companyService';
+import { useUserStore } from '../store/userStore';
 import CompanyFlowBuilder from '../components/CompanyFlowBuilder';
 import FlowBuilderModal from '../components/FlowBuilderModal';
 import { KnowledgeBaseUploadModal } from '../components/KnowledgeBaseUploadModal';
@@ -24,6 +25,7 @@ interface FlowStep {
 }
 
 const CompaniesPage: React.FC = () => {
+  const { user, canAccessCompany } = useUserStore();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [editingCompany, setEditingCompany] = useState<Partial<Company> | null>(null);
@@ -40,14 +42,23 @@ const CompaniesPage: React.FC = () => {
       setLoading(true);
       setError(null);
       const data = await companyService.getCompanies();
-      setCompanies(data);
+      
+      // Filtrar empresas según permisos del usuario
+      let filteredCompanies = data;
+      if (user && user.role !== 'administrador') {
+        filteredCompanies = data.filter(company => 
+          canAccessCompany(company.configId)
+        );
+      }
+      
+      setCompanies(filteredCompanies);
     } catch (err) {
-      setError('Error al cargar las empresas');
+      setError('Error al cargar los agentes');
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user, canAccessCompany]);
 
   useEffect(() => {
     loadCompanies();
@@ -116,7 +127,7 @@ const CompaniesPage: React.FC = () => {
       setSelectedCompany(updated);
       setEditingCompany(updated);
       setFlowSteps((updated as any).flujoBot || []);
-      setSuccessMessage('Empresa actualizada correctamente');
+      setSuccessMessage('Agente actualizado correctamente');
       
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -140,8 +151,8 @@ const CompaniesPage: React.FC = () => {
       <div className="w-80 bg-white flex flex-col border-r border-gray-200 shadow-sm">
         {/* Header */}
         <div className="bg-gradient-to-b from-slate-900 to-slate-800 text-white p-6">
-          <h1 className="text-2xl font-bold">🏢 Empresas</h1>
-          <p className="text-slate-300 text-sm mt-1">Gestión de empresas</p>
+          <h1 className="text-2xl font-bold">🤖 Agentes</h1>
+          <p className="text-slate-300 text-sm mt-1">Gestión de agentes</p>
         </div>
 
         {/* Companies List */}
@@ -150,8 +161,8 @@ const CompaniesPage: React.FC = () => {
             <div className="p-4 text-center text-gray-500">Cargando...</div>
           ) : companies.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              <div className="text-4xl mb-2">🏢</div>
-              <p>No hay empresas</p>
+              <div className="text-4xl mb-2">🤖</div>
+              <p>No hay agentes</p>
             </div>
           ) : (
             companies.map((company) => (
@@ -459,8 +470,8 @@ const CompaniesPage: React.FC = () => {
         ) : (
           <div className="flex items-center justify-center h-full text-gray-500">
             <div className="text-center">
-              <div className="text-6xl mb-4">🏢</div>
-              <p className="text-lg">Selecciona una empresa</p>
+              <div className="text-6xl mb-4">🤖</div>
+              <p className="text-lg">Selecciona un agente</p>
               <p className="text-sm mt-2">para ver y editar sus detalles</p>
             </div>
           </div>

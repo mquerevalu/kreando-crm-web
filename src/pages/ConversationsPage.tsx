@@ -1,9 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useAuthStore } from '../store/authStore';
+import { useUserStore } from '../store/userStore';
 import { conversationService } from '../services/conversationService';
 import { companyService, Company } from '../services/companyService';
+import { userService, User } from '../services/userService';
 import { useWebSocket } from '../hooks/useWebSocket';
 import MediaViewer from '../components/MediaViewer';
+import ConfirmDialog from '../components/ConfirmDialog';
+import AlertDialog from '../components/AlertDialog';
 
 interface Conversation {
   id: string;
@@ -18,6 +21,7 @@ interface Conversation {
   updatedAt?: number;
   crmIntegrated?: boolean;
   agentEnabled?: boolean;
+  assignedTo?: string; // userId del asesor asignado
 }
 
 interface Message {
@@ -32,6 +36,7 @@ interface Message {
 }
 
 const ConversationsPage: React.FC = () => {
+  const { user, canAccessCompany, canAccessConversation } = useUserStore();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -50,6 +55,34 @@ const ConversationsPage: React.FC = () => {
   const [showChatInMobile, setShowChatInMobile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [advisors, setAdvisors] = useState<User[]>([]);
+  const [currentAssignment, setCurrentAssignment] = useState<any>(null);
+  
+  // Estados para diálogos
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+  
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'error' | 'warning' | 'info' | 'success';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
 
   // Opciones para los selectores
   const sectorOptions = [
@@ -117,16 +150,36 @@ const ConversationsPage: React.FC = () => {
     const loadCompanies = async () => {
       try {
         const data = await companyService.getCompanies();
-        setCompanies(data);
-        if (data.length > 0) {
-          setSelectedCompany(data[0]);
+        
+        console.log('👤 Usuario actual:', user);
+        console.log('🏢 Empresas obtenidas:', data);
+        
+        // Filtrar empresas según permisos del usuario
+        let filteredCompanies = data;
+        if (user && user.role !== 'administrador') {
+          console.log('🔒 Filtrando empresas para rol:', user.role);
+          console.log('📋 Empresas asignadas:', user.assignedCompanies);
+          filteredCompanies = data.filter(company => {
+            const hasAccess = canAccessCompany(company.configId);
+            console.log(`  - ${company.nombreEmpresa} (${company.configId}): ${hasAccess ? '✅' : '❌'}`);
+            return hasAccess;
+          });
+        }
+        
+        console.log('✅ Empresas filtradas:', filteredCompanies);
+        setCompanies(filteredCompanies);
+        if (filteredCompanies.length > 0) {
+          setSelectedCompany(filteredCompanies[0]);
         }
       } catch (error) {
         console.error('Error loading companies:', error);
       }
     };
-    loadCompanies();
-  }, []);
+    
+    if (user) {
+      loadCompanies();
+    }
+  }, [user, canAccessCompany]);
 
   const loadConversations = useCallback(async (append: boolean = false) => {
     if (!selectedCompany?.phoneNumberId) return;
@@ -138,10 +191,40 @@ const ConversationsPage: React.FC = () => {
       const keyToUse = append ? lastConversationKeyRef.current : undefined;
       const result = await conversationService.getConversations(pageId, 500, keyToUse);
       
+      console.log('💬 Conversaciones obtenidas:', result.conversations.length);
+      console.log('👤 Rol del usuario:', user?.role);
+      
+      // Filtrar conversaciones según permisos del usuario
+      // - Administradores: ven todo
+      // - Operadores: ven todas las conversaciones de sus empresas asignadas
+      // - Asesores: solo ven conversaciones específicas asignadas
+      let filteredConversations = result.conversations;
+      
+      if (user) {
+        if (user.role === 'asesor') {
+          console.log('🔒 Filtrando conversaciones para ASESOR');
+          console.log('📋 Conversaciones asignadas:', user.assignedConversations);
+          filteredConversations = result.conversations.filter(conv => {
+            const hasAccess = canAccessConversation(conv.pageId, conv.senderId);
+            console.log(`  - ${conv.phoneNumber}: ${hasAccess ? '✅' : '❌'}`);
+            return hasAccess;
+          });
+        } else if (user.role === 'operador') {
+          console.log('✅ Usuario OPERADOR: ve todas las conversaciones de la empresa');
+          // Los operadores ven todas las conversaciones de sus empresas asignadas
+          // No se filtra por conversación específica
+        } else {
+          console.log('✅ Usuario ADMINISTRADOR: ve todas las conversaciones');
+          // Los administradores ven todo
+        }
+      }
+      
+      console.log('✅ Conversaciones filtradas:', filteredConversations.length);
+      
       if (append) {
-        setConversations(prev => [...prev, ...result.conversations]);
+        setConversations(prev => [...prev, ...filteredConversations]);
       } else {
-        setConversations(result.conversations);
+        setConversations(filteredConversations);
         setSelectedConversation(null);
         setMessages([]);
       }
@@ -321,7 +404,12 @@ const ConversationsPage: React.FC = () => {
       console.log(`Agent ${newAgentEnabled ? 'enabled' : 'disabled'} for conversation`);
     } catch (error) {
       console.error('Error toggling agent:', error);
-      alert('Error al cambiar el estado del agente');
+      setAlertDialog({
+        isOpen: true,
+        title: 'Error',
+        message: 'Error al cambiar el estado del agente',
+        type: 'error',
+      });
     }
   };
 
@@ -411,7 +499,12 @@ const ConversationsPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Error sending file:', error);
-      alert('Error al enviar el archivo. Por favor intenta de nuevo.');
+      setAlertDialog({
+        isOpen: true,
+        title: 'Error',
+        message: 'Error al enviar el archivo. Por favor intenta de nuevo.',
+        type: 'error',
+      });
     } finally {
       setLoading(false);
       setIsUploading(false);
@@ -451,7 +544,12 @@ const ConversationsPage: React.FC = () => {
 
   const handleOpenWebhookModal = () => {
     if (!selectedCompany?.urlWebHook) {
-      alert('La empresa no tiene configurado un webhook');
+      setAlertDialog({
+        isOpen: true,
+        title: 'Webhook no configurado',
+        message: 'La empresa no tiene configurado un webhook',
+        type: 'warning',
+      });
       return;
     }
 
@@ -534,6 +632,125 @@ const ConversationsPage: React.FC = () => {
     } catch (error) {
       console.error('Error sending to webhook:', error);
       setSuccessMessage('✗ Error al enviar datos al webhook');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenAssignModal = async () => {
+    if (!user || (user.role !== 'administrador' && user.role !== 'operador')) {
+      return;
+    }
+    
+    if (!selectedCompany || !selectedConversation) {
+      setAlertDialog({
+        isOpen: true,
+        title: 'Error',
+        message: 'No hay empresa o conversación seleccionada',
+        type: 'error',
+      });
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // Verificar si ya tiene asignación
+      const assignmentData = await userService.getConversationAssignment(
+        selectedConversation.pageId,
+        selectedConversation.senderId
+      );
+      
+      setCurrentAssignment(assignmentData.assigned ? assignmentData.assignment : null);
+      
+      // Cargar lista de asesores asignados a esta empresa
+      const advisorsList = await userService.listAdvisors(selectedCompany.configId);
+      
+      if (advisorsList.length === 0) {
+        setAlertDialog({
+          isOpen: true,
+          title: 'Sin asesores',
+          message: 'No hay asesores asignados a esta empresa. Por favor, asigna asesores desde el panel de usuarios.',
+          type: 'warning',
+        });
+        setLoading(false);
+        return;
+      }
+      
+      setAdvisors(advisorsList);
+      setShowAssignModal(true);
+    } catch (error) {
+      console.error('Error loading advisors:', error);
+      setAlertDialog({
+        isOpen: true,
+        title: 'Error',
+        message: 'Error al cargar la información de asignación',
+        type: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnassignConversation = async () => {
+    if (!currentAssignment || !selectedConversation) return;
+    
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Desasignar conversación',
+      message: `¿Desasignar esta conversación de ${currentAssignment.advisorName}?`,
+      type: 'warning',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await userService.unassignConversation(
+            currentAssignment.userId,
+            selectedConversation.pageId,
+            selectedConversation.senderId
+          );
+          
+          setCurrentAssignment(null);
+          setSuccessMessage('✓ Conversación desasignada correctamente');
+          
+          setTimeout(() => setSuccessMessage(null), 3000);
+        } catch (error) {
+          console.error('Error unassigning conversation:', error);
+          setSuccessMessage('✗ Error al desasignar conversación');
+          setTimeout(() => setSuccessMessage(null), 3000);
+        } finally {
+          setLoading(false);
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+        }
+      },
+    });
+  };
+
+  const handleAssignConversation = async (advisorId: string) => {
+    if (!selectedConversation) return;
+    
+    try {
+      setLoading(true);
+      await userService.assignConversation(
+        advisorId,
+        selectedConversation.pageId,
+        selectedConversation.senderId
+      );
+      
+      // Recargar la asignación actual
+      const assignmentData = await userService.getConversationAssignment(
+        selectedConversation.pageId,
+        selectedConversation.senderId
+      );
+      setCurrentAssignment(assignmentData.assigned ? assignmentData.assignment : null);
+      
+      setSuccessMessage('✓ Conversación asignada correctamente');
+      setShowAssignModal(false);
+      
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (error) {
+      console.error('Error assigning conversation:', error);
+      setSuccessMessage('✗ Error al asignar conversación');
       setTimeout(() => setSuccessMessage(null), 3000);
     } finally {
       setLoading(false);
@@ -693,6 +910,18 @@ const ConversationsPage: React.FC = () => {
                   <span className="hidden md:inline-flex px-2 py-1 bg-white/20 text-white text-xs rounded-full">
                     ✓ CRM
                   </span>
+                )}
+                {(user?.role === 'administrador' || user?.role === 'operador') && (
+                  <button 
+                    onClick={handleOpenAssignModal}
+                    disabled={loading}
+                    className="p-2 hover:bg-white/10 rounded-full transition disabled:opacity-50"
+                    title="Asignar a asesor"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </button>
                 )}
                 <button 
                   onClick={handleOpenWebhookModal}
@@ -1019,6 +1248,120 @@ const ConversationsPage: React.FC = () => {
           {successMessage}
         </div>
       )}
+
+      {/* Assign Conversation Modal */}
+      {showAssignModal && selectedConversation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-2">Asignar Conversación</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              {selectedConversation.participantName || selectedConversation.phoneNumber}
+            </p>
+            
+            {/* Asignación actual */}
+            {currentAssignment ? (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-blue-900 mb-1">
+                      📌 Asignado actualmente a:
+                    </p>
+                    <p className="font-medium text-gray-900">{currentAssignment.advisorName}</p>
+                    <p className="text-sm text-gray-600">{currentAssignment.advisorEmail}</p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Asignado por: {currentAssignment.assignedByName}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(currentAssignment.assignedAt).toLocaleString('es-ES')}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleUnassignConversation}
+                  disabled={loading}
+                  className="mt-3 w-full bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition disabled:opacity-50 text-sm font-medium"
+                >
+                  🗑️ Desasignar
+                </button>
+              </div>
+            ) : (
+              <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  ℹ️ Esta conversación no está asignada a ningún asesor
+                </p>
+              </div>
+            )}
+            
+            {/* Lista de asesores */}
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-gray-700 mb-2">
+                {currentAssignment ? 'Reasignar a:' : 'Asignar a:'}
+              </p>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {advisors.length === 0 ? (
+                  <p className="text-center text-gray-500 py-4">No hay asesores disponibles</p>
+                ) : (
+                  advisors.map((advisor) => {
+                    const isCurrentlyAssigned = currentAssignment?.userId === advisor.userId;
+                    return (
+                      <button
+                        key={advisor.userId}
+                        onClick={() => !isCurrentlyAssigned && handleAssignConversation(advisor.userId)}
+                        disabled={loading || isCurrentlyAssigned}
+                        className={`w-full text-left px-4 py-3 rounded-lg border transition ${
+                          isCurrentlyAssigned
+                            ? 'bg-blue-100 border-blue-300 cursor-not-allowed'
+                            : 'border-gray-200 hover:bg-green-50 hover:border-green-300'
+                        } disabled:opacity-50`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{advisor.name}</div>
+                            <div className="text-sm text-gray-500">{advisor.email}</div>
+                          </div>
+                          {isCurrentlyAssigned && (
+                            <span className="text-xs text-blue-600 font-semibold">Actual</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+            
+            <button
+              onClick={() => {
+                setShowAssignModal(false);
+                setCurrentAssignment(null);
+              }}
+              disabled={loading}
+              className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition disabled:opacity-50"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type={confirmDialog.type}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
+      
+      {/* Alert Dialog */}
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        type={alertDialog.type}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+      />
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { useUserStore } from '../store/userStore';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,6 +10,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+  const { isAdmin, isAdvisor } = useUserStore();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -35,24 +37,36 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
         <nav className="p-4 space-y-2">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-700 text-gray-300 hover:text-white transition font-medium text-sm"
-          >
-            {sidebarOpen ? '📊 Dashboard' : '📊'}
-          </button>
+          {isAdmin() && (
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-700 text-gray-300 hover:text-white transition font-medium text-sm"
+            >
+              {sidebarOpen ? '📊 Dashboard' : '📊'}
+            </button>
+          )}
           <button
             onClick={() => navigate('/conversations')}
             className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-700 text-gray-300 hover:text-white transition font-medium text-sm"
           >
             {sidebarOpen ? '💬 Conversaciones' : '💬'}
           </button>
-          <button
-            onClick={() => navigate('/companies')}
-            className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-700 text-gray-300 hover:text-white transition font-medium text-sm"
-          >
-            {sidebarOpen ? '🏢 Empresas' : '🏢'}
-          </button>
+          {!isAdvisor() && (
+            <button
+              onClick={() => navigate('/companies')}
+              className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-700 text-gray-300 hover:text-white transition font-medium text-sm"
+            >
+              {sidebarOpen ? '🤖 Agentes' : '🤖'}
+            </button>
+          )}
+          {isAdmin() && (
+            <button
+              onClick={() => navigate('/users')}
+              className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-700 text-gray-300 hover:text-white transition font-medium text-sm"
+            >
+              {sidebarOpen ? '👥 Usuarios' : '👥'}
+            </button>
+          )}
         </nav>
       </div>
 

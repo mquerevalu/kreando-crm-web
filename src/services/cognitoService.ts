@@ -28,13 +28,16 @@ export interface AuthResponse {
 export const cognitoService = {
   login: async (username: string, password: string): Promise<AuthResponse> => {
     return new Promise((resolve, reject) => {
+      // Agregar prefijo agente_ al username
+      const fullUsername = username.startsWith('agente_') ? username : `agente_${username}`;
+      
       const authenticationDetails = new AuthenticationDetails({
-        Username: username,
+        Username: fullUsername,
         Password: password,
       });
 
       const cognitoUser = new CognitoUser({
-        Username: username,
+        Username: fullUsername,
         Pool: userPool,
       });
 
@@ -46,8 +49,14 @@ export const cognitoService = {
           // Decodificar el token para obtener información del usuario
           const decodedToken = decodeToken(accessToken);
           
+          // Remover el prefijo agente_ del username
+          let cleanUsername = decodedToken.username || fullUsername;
+          if (cleanUsername.startsWith('agente_')) {
+            cleanUsername = cleanUsername.substring(7);
+          }
+          
           const user: CognitoUserData = {
-            username: decodedToken.username || username,
+            username: cleanUsername,
             email: decodedToken.email || username,
             name: decodedToken.name || decodedToken.email || username,
           };

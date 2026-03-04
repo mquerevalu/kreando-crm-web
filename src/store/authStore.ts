@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { cognitoService, CognitoUser } from '../services/cognitoService';
+import { useUserStore } from './userStore';
 
 interface AuthStore {
   user: CognitoUser | null;
@@ -42,6 +43,14 @@ export const useAuthStore = create<AuthStore>((set) => ({
         isAuthenticated: true,
         isLoading: false,
       });
+      
+      // Cargar el perfil del usuario inmediatamente después del login
+      try {
+        await useUserStore.getState().loadUserProfile();
+      } catch (profileError) {
+        console.error('Error loading user profile after login:', profileError);
+        // No bloqueamos el login si falla la carga del perfil
+      }
     } catch (error: any) {
       const errorMessage = error.message || 'Error al iniciar sesión';
       set({
@@ -54,6 +63,34 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   logout: () => {
     cognitoService.logout();
+    
+    // Limpiar también el userStore
+    useUserStore.getState().clearUser();
+    
+    // Limpiar TODAS las claves relacionadas con la aplicación
+    const keysToRemove = [
+      'token',
+      'user',
+      'refreshToken',
+      'user-storage',
+      // Claves de Cognito
+      'CognitoIdentityServiceProvider',
+      'amplify-auto-track-session',
+      'amplify-signin-with-hostedUI',
+    ];
+    
+    // Remover claves específicas
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+    });
+    
+    // Remover todas las claves que empiecen con "CognitoIdentityServiceProvider"
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('CognitoIdentityServiceProvider')) {
+        localStorage.removeItem(key);
+      }
+    });
+    
     set({
       user: null,
       token: null,
@@ -77,6 +114,11 @@ export const useAuthStore = create<AuthStore>((set) => ({
           refreshToken,
           isAuthenticated: true,
           isCheckingAuth: false,
+        });
+        
+        // Cargar el perfil del usuario al verificar la autenticación
+        useUserStore.getState().loadUserProfile().catch(error => {
+          console.error('Error loading user profile on checkAuth:', error);
         });
       } catch (error) {
         localStorage.removeItem('token');
