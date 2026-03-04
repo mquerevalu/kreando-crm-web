@@ -101,6 +101,16 @@ const CompaniesPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
+      // Procesar pineconeNamespaces: convertir string a array si contiene comas
+      let processedNamespaces = (editingCompany as any).pineconeNamespaces;
+      if (typeof processedNamespaces === 'string' && processedNamespaces.trim()) {
+        if (processedNamespaces.includes(',')) {
+          processedNamespaces = processedNamespaces.split(',').map(ns => ns.trim()).filter(ns => ns);
+        }
+      } else if (processedNamespaces === '') {
+        processedNamespaces = undefined;
+      }
+
       // Preparar datos para actualizar (excluir campos no editables)
       const updateData: Partial<Company> = {
         nombreEmpresa: editingCompany.nombreEmpresa,
@@ -112,7 +122,7 @@ const CompaniesPage: React.FC = () => {
         phoneNumberId: editingCompany.phoneNumberId,
         wspNumberId: editingCompany.wspNumberId,
         accountId: editingCompany.accountId,
-        pineconeNamespaces: (editingCompany as any).pineconeNamespaces,
+        pineconeNamespaces: processedNamespaces,
         pineconeApiKey: (editingCompany as any).pineconeApiKey,
         mensajeDefault: (editingCompany as any).mensajeDefault,
         ...(activeTab === 'flow' && { flujoBot: flowSteps as any }),
@@ -351,15 +361,7 @@ const CompaniesPage: React.FC = () => {
                           : (editingCompany as any).pineconeNamespaces || ''
                       }
                       onChange={(e) => {
-                        const value = e.target.value.trim();
-                        if (value === '') {
-                          handleInputChange('pineconeNamespaces' as any, undefined);
-                        } else if (value.includes(',')) {
-                          const namespaces = value.split(',').map(ns => ns.trim()).filter(ns => ns);
-                          handleInputChange('pineconeNamespaces' as any, namespaces);
-                        } else {
-                          handleInputChange('pineconeNamespaces' as any, value);
-                        }
+                        handleInputChange('pineconeNamespaces' as any, e.target.value);
                       }}
                       placeholder="default o empresa-abc, productos-generales"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
