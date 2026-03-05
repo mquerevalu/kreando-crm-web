@@ -466,7 +466,7 @@ const CompaniesPage: React.FC = () => {
 
                   {/* Phone Number ID */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number ID</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number ID (Identificador de número de teléfono)</label>
                     <input
                       type="text"
                       value={editingCompany.phoneNumberId || ''}
@@ -477,7 +477,7 @@ const CompaniesPage: React.FC = () => {
 
                   {/* WSP Number ID */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">WSP Number ID</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">WSP Number ID (Identificador de número de teléfono)</label>
                     <input
                       type="text"
                       value={editingCompany.wspNumberId || ''}
@@ -488,7 +488,7 @@ const CompaniesPage: React.FC = () => {
 
                   {/* Account ID */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Account ID</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Account ID (Identificador de la cuenta de WhatsApp Business)</label>
                     <input
                       type="text"
                       value={editingCompany.accountId || ''}

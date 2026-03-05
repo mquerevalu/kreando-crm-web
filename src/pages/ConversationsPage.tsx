@@ -7,6 +7,8 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import MediaViewer from '../components/MediaViewer';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AlertDialog from '../components/AlertDialog';
+import WhatsAppTemplateModal from '../components/WhatsAppTemplateModal';
+import { whatsappTemplateService } from '../services/whatsappTemplateService';
 import { useSearchParams } from 'react-router-dom';
 
 interface Conversation {
@@ -23,6 +25,8 @@ interface Conversation {
   crmIntegrated?: boolean;
   agentEnabled?: boolean;
   assignedTo?: string; // userId del asesor asignado
+  canSendFreeform?: boolean; // Puede enviar mensajes normales (dentro de 24h)
+  hoursSinceLastMessage?: number; // Horas desde el último mensaje
 }
 
 interface Message {
@@ -60,6 +64,7 @@ const ConversationsPage: React.FC = () => {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [advisors, setAdvisors] = useState<User[]>([]);
   const [currentAssignment, setCurrentAssignment] = useState<any>(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
   
   // Ref para controlar si ya se seleccionó una conversación desde URL
   const hasAutoSelectedRef = useRef(false);
@@ -829,6 +834,57 @@ const ConversationsPage: React.FC = () => {
     }
   };
 
+  const handleSendTemplate = async (templateName: string, languageCode: string, components: any[]) => {
+    if (!selectedConversation || !selectedCompany) return;
+
+    try {
+      setLoading(true);
+      
+      await whatsappTemplateService.sendTemplate(
+        selectedCompany.phoneNumberId,
+        selectedConversation.phoneNumber,
+        templateName,
+        languageCode,
+        components,
+        user?.name || 'Asesor' // Pasar el nombre del usuario
+      );
+
+      setSuccessMessage('✓ Plantilla enviada correctamente');
+      setTimeout(() => setSuccessMessage(null), 3000);
+      
+      // Reload messages sin cerrar la conversación
+      const data = await conversationService.getMessages(selectedConversation.pageId, selectedConversation.senderId);
+      setMessages(data);
+      
+      // NO recargar todas las conversaciones para evitar que se cierre el chat
+      // El WebSocket ya actualizará la lista automáticamente
+    } catch (error) {
+      console.error('Error sending template:', error);
+      setAlertDialog({
+        isOpen: true,
+        title: 'Error',
+        message: 'Error al enviar la plantilla. Por favor intenta de nuevo.',
+        type: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const get24HourWindowStatus = () => {
+    if (!selectedConversation?.hoursSinceLastMessage) return { color: 'green', text: 'Activa', icon: '✓' };
+    
+    const hours = selectedConversation.hoursSinceLastMessage;
+    
+    if (hours < 20) {
+      return { color: 'green', text: `${Math.floor(hours)}h restantes`, icon: '✓' };
+    } else if (hours < 24) {
+      return { color: 'yellow', text: `${Math.floor(24 - hours)}h restantes`, icon: '⚠️' };
+    } else {
+      return { color: 'red', text: 'Ventana cerrada', icon: '🔒' };
+    }
+  };
+
   return (
     <div className="flex h-full bg-gray-50">
       {/* Conversations List - WhatsApp Style - Ocultar en mobile cuando hay chat seleccionado */}
@@ -975,7 +1031,25 @@ const ConversationsPage: React.FC = () => {
                 <h3 className="font-semibold text-white truncate">
                   {selectedConversation.participantName || 'Usuario'}
                 </h3>
-                <p className="text-xs text-white/80 truncate">{selectedConversation.phoneNumber}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-white/80 truncate">{selectedConversation.phoneNumber}</p>
+                  {/* Indicador de ventana de 24 horas */}
+                  {(() => {
+                    const status = get24HourWindowStatus();
+                    return (
+                      <span 
+                        className={`text-xs px-2 py-0.5 rounded-full ${
+                          status.color === 'green' ? 'bg-green-500/30 text-green-100' :
+                          status.color === 'yellow' ? 'bg-yellow-500/30 text-yellow-100' :
+                          'bg-red-500/30 text-red-100'
+                        }`}
+                        title={`Ventana de mensajería: ${status.text}`}
+                      >
+                        {status.icon} {status.text}
+                      </span>
+                    );
+                  })()}
+                </div>
               </div>
               
               {/* Acciones */}
@@ -1105,6 +1179,18 @@ const ConversationsPage: React.FC = () => {
                 </div>
               )}
               
+              {/* Botón de plantilla (siempre visible) */}
+              <button
+                onClick={() => setShowTemplateModal(true)}
+                disabled={loading || !selectedCompany?.accessToken}
+                className="p-2 bg-green-600 hover:bg-green-700 rounded-full transition text-white disabled:opacity-50 flex-shrink-0"
+                title="Enviar plantilla aprobada"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </button>
+              
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
@@ -1141,6 +1227,7 @@ const ConversationsPage: React.FC = () => {
                 onClick={handleSendReply}
                 disabled={loading || isUploading || !replyMessage.trim()}
                 className="p-2 bg-[#008069] hover:bg-[#017561] rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed text-white"
+                title="Enviar mensaje"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -1454,6 +1541,16 @@ const ConversationsPage: React.FC = () => {
         type={alertDialog.type}
         onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
       />
+      
+      {/* WhatsApp Template Modal */}
+      {showTemplateModal && selectedConversation && selectedCompany && (
+        <WhatsAppTemplateModal
+          isOpen={showTemplateModal}
+          onClose={() => setShowTemplateModal(false)}
+          onSend={handleSendTemplate}
+          phoneNumberId={selectedCompany.phoneNumberId}
+        />
+      )}
     </div>
   );
 };
