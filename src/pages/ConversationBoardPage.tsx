@@ -182,7 +182,7 @@ const ConversationBoardPage: React.FC = () => {
       
       const result = await conversationService.getConversations(
         pageId, 
-        500, 
+        1000, // Límite aumentado para el tablero (con filtros de fecha es eficiente) 
         undefined, 
         startTimestamp, 
         endTimestamp,
