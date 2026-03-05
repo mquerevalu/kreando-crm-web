@@ -230,8 +230,13 @@ const ConversationsPage: React.FC = () => {
         setConversations(prev => [...prev, ...filteredConversations]);
       } else {
         setConversations(filteredConversations);
-        setSelectedConversation(null);
-        setMessages([]);
+        // No resetear selectedConversation si hay parámetros de URL (auto-selección pendiente)
+        // o si ya hay una conversación seleccionada
+        const hasUrlParams = searchParams.get('pageId') && searchParams.get('senderId');
+        if (!hasUrlParams && !selectedConversation) {
+          setSelectedConversation(null);
+          setMessages([]);
+        }
       }
       
       setHasMoreConversations(result.hasMore);

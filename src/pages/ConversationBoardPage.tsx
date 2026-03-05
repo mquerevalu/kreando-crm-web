@@ -23,7 +23,7 @@ interface Conversation {
 }
 
 const ConversationBoardPage: React.FC = () => {
-  const { user, canAccessCompany } = useUserStore();
+  const { user, canAccessCompany, canAccessConversation } = useUserStore();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [statuses, setStatuses] = useState<ConversationStatus[]>([]);
@@ -189,15 +189,33 @@ const ConversationBoardPage: React.FC = () => {
         dateField
       );
       
-      console.log('📥 Loaded conversations:', result.conversations.map(c => ({
-        id: c.id,
-        statusId: c.statusId,
-        hasStatusId: !!c.statusId,
-      })));
+      console.log('📥 Loaded conversations:', result.conversations.length);
+      console.log('👤 Rol del usuario:', user?.role);
+      
+      // Filtrar conversaciones según permisos del usuario (igual que en ConversationsPage)
+      let filteredConversations = result.conversations;
+      
+      if (user) {
+        if (user.role === 'asesor') {
+          console.log('🔒 Filtrando conversaciones para ASESOR en tablero');
+          console.log('📋 Conversaciones asignadas:', user.assignedConversations);
+          filteredConversations = result.conversations.filter(conv => {
+            const hasAccess = canAccessConversation(conv.pageId, conv.senderId);
+            console.log(`  - ${conv.phoneNumber}: ${hasAccess ? '✅' : '❌'}`);
+            return hasAccess;
+          });
+        } else if (user.role === 'operador') {
+          console.log('✅ Usuario OPERADOR: ve todas las conversaciones de la empresa');
+        } else {
+          console.log('✅ Usuario ADMINISTRADOR: ve todas las conversaciones');
+        }
+      }
+      
+      console.log('✅ Conversaciones filtradas:', filteredConversations.length);
       
       // Agrupar conversaciones por estado
       const grouped: Record<string, Conversation[]> = {};
-      result.conversations.forEach((conv: Conversation) => {
+      filteredConversations.forEach((conv: Conversation) => {
         const statusId = conv.statusId || 'no-status';
         if (!grouped[statusId]) {
           grouped[statusId] = [];
@@ -835,6 +853,41 @@ const ConversationBoardPage: React.FC = () => {
       {/* Kanban Board */}
       <div className="flex-1 overflow-x-auto p-4">
         <div className="flex gap-4 h-full min-w-max">
+          {/* Sin estado - SIEMPRE PRIMERO */}
+          {conversationsByStatus['no-status'] && conversationsByStatus['no-status'].length > 0 && (
+            <DroppableColumn id="no-status" className="flex flex-col w-80 bg-gray-100 rounded-lg">
+              <div className="p-4 bg-gray-400 rounded-t-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-white">Sin Estado</h3>
+                  <span className="bg-white/30 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {filterConversations(conversationsByStatus['no-status'] || []).length}
+                  </span>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                {filterConversations(conversationsByStatus['no-status'] || []).map((conversation) => (
+                  <DraggableConversationCard
+                    key={conversation.id}
+                    conversation={conversation}
+                    onClick={() => handleConversationClick(conversation)}
+                    onViewDetail={(e) => handleViewDetail(conversation, e)}
+                    onToggleCRM={(e) => handleToggleCRM(conversation, e)}
+                    onViewHistory={(e) => {
+                      e.stopPropagation();
+                      handleViewHistory(conversation);
+                    }}
+                  />
+                ))}
+                {filterConversations(conversationsByStatus['no-status'] || []).length === 0 && (
+                  <div className="text-center text-gray-400 text-sm py-8">
+                    {searchTerm || filterUnread ? 'Sin resultados' : 'Sin conversaciones'}
+                  </div>
+                )}
+              </div>
+            </DroppableColumn>
+          )}
+          
+          {/* Estados configurados */}
           {statuses.map((status) => (
             <DroppableColumn key={status.statusId} id={status.statusId} className="flex flex-col w-80 bg-gray-100 rounded-lg">
               {/* Column Header */}
@@ -922,40 +975,6 @@ const ConversationBoardPage: React.FC = () => {
               </div>
             </DroppableColumn>
           ))}
-
-          {/* Sin estado */}
-          {conversationsByStatus['no-status'] && conversationsByStatus['no-status'].length > 0 && (
-            <DroppableColumn id="no-status" className="flex flex-col w-80 bg-gray-100 rounded-lg">
-              <div className="p-4 bg-gray-400 rounded-t-lg flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-white">Sin Estado</h3>
-                  <span className="bg-white/30 text-white text-xs font-bold px-2 py-1 rounded-full">
-                    {filterConversations(conversationsByStatus['no-status'] || []).length}
-                  </span>
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                {filterConversations(conversationsByStatus['no-status'] || []).map((conversation) => (
-                  <DraggableConversationCard
-                    key={conversation.id}
-                    conversation={conversation}
-                    onClick={() => handleConversationClick(conversation)}
-                    onViewDetail={(e) => handleViewDetail(conversation, e)}
-                    onToggleCRM={(e) => handleToggleCRM(conversation, e)}
-                    onViewHistory={(e) => {
-                      e.stopPropagation();
-                      handleViewHistory(conversation);
-                    }}
-                  />
-                ))}
-                {filterConversations(conversationsByStatus['no-status'] || []).length === 0 && (
-                  <div className="text-center text-gray-400 text-sm py-8">
-                    {searchTerm || filterUnread ? 'Sin resultados' : 'Sin conversaciones'}
-                  </div>
-                )}
-              </div>
-            </DroppableColumn>
-          )}
         </div>
       </div>
 
