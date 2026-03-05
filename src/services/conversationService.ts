@@ -154,18 +154,31 @@ const logApiResponse = (method: string, endpoint: string, response: any) => {
 };
 
 export const conversationService = {
-  getConversations: async (pageId: string, limit: number = 500, lastKey?: string): Promise<{ conversations: Conversation[], hasMore: boolean, lastKey?: string }> => {
-    logApiCall('GET', `/conversations?pageId=${pageId}&limit=${limit}`);
+  getConversations: async (
+    pageId: string, 
+    limit: number = 500, 
+    lastKey?: string,
+    startDate?: number,
+    endDate?: number,
+    dateField?: 'createdAt' | 'updatedAt'
+  ): Promise<{ conversations: Conversation[], hasMore: boolean, lastKey?: string }> => {
+    const queryParams = new URLSearchParams({ pageId, limit: limit.toString() });
+    if (lastKey) queryParams.append('lastKey', lastKey);
+    if (startDate) queryParams.append('startDate', startDate.toString());
+    if (endDate) queryParams.append('endDate', endDate.toString());
+    if (dateField) queryParams.append('dateField', dateField);
+    
+    logApiCall('GET', `/conversations?${queryParams.toString()}`);
     try {
       const params: any = { pageId, limit };
-      if (lastKey) {
-        params.lastKey = lastKey;
-      }
+      if (lastKey) params.lastKey = lastKey;
+      if (startDate) params.startDate = startDate.toString();
+      if (endDate) params.endDate = endDate.toString();
+      if (dateField) params.dateField = dateField;
       
       const response = await apiClient.get('/conversations', { params });
-      logApiResponse('GET', `/conversations?pageId=${pageId}&limit=${limit}`, response.data);
+      logApiResponse('GET', `/conversations?${queryParams.toString()}`, response.data);
       
-      // El backend ahora devuelve { conversations, hasMore, lastKey }
       return {
         conversations: response.data.conversations || response.data,
         hasMore: response.data.hasMore || false,
@@ -174,7 +187,7 @@ export const conversationService = {
     } catch (error) {
       console.warn('API error, using mock data:', error);
       await new Promise(resolve => setTimeout(resolve, 500));
-      logApiResponse('GET', `/conversations?pageId=${pageId}&limit=${limit}`, MOCK_CONVERSATIONS);
+      logApiResponse('GET', `/conversations?${queryParams.toString()}`, MOCK_CONVERSATIONS);
       return {
         conversations: MOCK_CONVERSATIONS,
         hasMore: false,

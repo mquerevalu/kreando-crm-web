@@ -54,7 +54,10 @@ const ConversationBoardPage: React.FC = () => {
   const [showStatusChangeModal, setShowStatusChangeModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterUnread, setFilterUnread] = useState(false);
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [datePreset, setDatePreset] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('month');
+  const [dateField, setDateField] = useState<'createdAt' | 'updatedAt'>('updatedAt');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedConversation, setDraggedConversation] = useState<Conversation | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -128,6 +131,13 @@ const ConversationBoardPage: React.FC = () => {
     }
   }, [selectedCompany]);
 
+  // Recargar conversaciones cuando cambien los filtros de fecha
+  useEffect(() => {
+    if (selectedCompany) {
+      loadConversations();
+    }
+  }, [datePreset, startDate, endDate, dateField]);
+
   const loadStatuses = async () => {
     if (!selectedCompany) return;
     try {
@@ -143,7 +153,41 @@ const ConversationBoardPage: React.FC = () => {
     try {
       setLoading(true);
       const pageId = `whatsapp-${selectedCompany.phoneNumberId}`;
-      const result = await conversationService.getConversations(pageId, 500);
+      
+      // Calcular timestamps según el preset o fechas personalizadas
+      let startTimestamp: number | undefined;
+      let endTimestamp: number | undefined;
+      
+      if (datePreset === 'custom' && startDate && endDate) {
+        startTimestamp = new Date(startDate).setHours(0, 0, 0, 0);
+        endTimestamp = new Date(endDate).setHours(23, 59, 59, 999);
+      } else if (datePreset !== 'all') {
+        const now = Date.now();
+        endTimestamp = now;
+        
+        switch (datePreset) {
+          case 'today':
+            startTimestamp = new Date().setHours(0, 0, 0, 0);
+            break;
+          case 'week':
+            startTimestamp = now - (7 * 24 * 60 * 60 * 1000);
+            break;
+          case 'month':
+            startTimestamp = now - (30 * 24 * 60 * 60 * 1000);
+            break;
+        }
+      }
+      
+      console.log('📅 Date filter:', { datePreset, dateField, startTimestamp, endTimestamp, startDate, endDate });
+      
+      const result = await conversationService.getConversations(
+        pageId, 
+        500, 
+        undefined, 
+        startTimestamp, 
+        endTimestamp,
+        dateField
+      );
       
       console.log('📥 Loaded conversations:', result.conversations.map(c => ({
         id: c.id,
@@ -158,8 +202,6 @@ const ConversationBoardPage: React.FC = () => {
         if (!grouped[statusId]) {
           grouped[statusId] = [];
         }
-        // IMPORTANTE: Mantener el statusId original (undefined si no tiene)
-        // No forzar 'no-status' en el objeto
         grouped[statusId].push(conv);
       });
       
@@ -345,27 +387,7 @@ const ConversationBoardPage: React.FC = () => {
       filtered = filtered.filter(conv => conv.unreadCount && conv.unreadCount > 0);
     }
 
-    // Filtro por fecha
-    if (dateFilter !== 'all') {
-      const now = Date.now();
-      const oneDayMs = 24 * 60 * 60 * 1000;
-      
-      filtered = filtered.filter(conv => {
-        const convTime = conv.updatedAt || 0;
-        
-        switch (dateFilter) {
-          case 'today':
-            return now - convTime < oneDayMs;
-          case 'week':
-            return now - convTime < 7 * oneDayMs;
-          case 'month':
-            return now - convTime < 30 * oneDayMs;
-          default:
-            return true;
-        }
-      });
-    }
-
+    // El filtro de fecha ahora se hace en el backend
     return filtered;
   };
 
@@ -720,16 +742,64 @@ const ConversationBoardPage: React.FC = () => {
               </svg>
             </div>
 
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value as any)}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Todas las fechas</option>
-              <option value="today">Hoy</option>
-              <option value="week">Última semana</option>
-              <option value="month">Último mes</option>
-            </select>
+            <div className="flex gap-2 items-center">
+              <select
+                value={dateField}
+                onChange={(e) => setDateField(e.target.value as 'createdAt' | 'updatedAt')}
+                className="px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                title="Campo de fecha para filtrar"
+              >
+                <option value="updatedAt">Última actividad</option>
+                <option value="createdAt">Fecha de creación</option>
+              </select>
+              
+              <select
+                value={datePreset}
+                onChange={(e) => {
+                  const value = e.target.value as any;
+                  setDatePreset(value);
+                  if (value === 'custom') {
+                    // Establecer fechas por defecto: último mes
+                    const today = new Date();
+                    const oneMonthAgo = new Date();
+                    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                    
+                    setEndDate(today.toISOString().split('T')[0]);
+                    setStartDate(oneMonthAgo.toISOString().split('T')[0]);
+                  } else {
+                    setStartDate('');
+                    setEndDate('');
+                  }
+                }}
+                className="px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">Todas las fechas</option>
+                <option value="today">Hoy</option>
+                <option value="week">Última semana</option>
+                <option value="month">Último mes</option>
+                <option value="custom">Rango personalizado</option>
+              </select>
+              
+              {datePreset === 'custom' && (
+                <>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Desde"
+                  />
+                  <span className="text-gray-500">-</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Hasta"
+                  />
+                </>
+              )}
+            </div>
             
             <button
               onClick={() => setFilterUnread(!filterUnread)}
@@ -745,12 +815,15 @@ const ConversationBoardPage: React.FC = () => {
               No leídos
             </button>
 
-            {(searchTerm || filterUnread || dateFilter !== 'all') && (
+            {(searchTerm || filterUnread || datePreset !== 'month' || dateField !== 'updatedAt') && (
               <button
                 onClick={() => {
                   setSearchTerm('');
                   setFilterUnread(false);
-                  setDateFilter('all');
+                  setDatePreset('month');
+                  setDateField('updatedAt');
+                  setStartDate('');
+                  setEndDate('');
                 }}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
               >
