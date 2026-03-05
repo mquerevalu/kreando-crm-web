@@ -3,7 +3,6 @@ import {
   ReactFlow,
   Node,
   Edge,
-  addEdge,
   Connection,
   useNodesState,
   useEdgesState,
@@ -11,10 +10,15 @@ import {
   Controls,
   MiniMap,
   NodeTypes,
+  MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import WorkflowNode from './WorkflowNode';
 import FlowStepEditor from './FlowStepEditor';
+import { 
+  convertToReactFlowFormat, 
+  calculateHierarchicalLayout 
+} from '../utils/workflowConverter';
 
 interface FlowStep {
   stepId: string;
@@ -58,46 +62,80 @@ const CompanyFlowBuilder: React.FC<CompanyFlowBuilderProps> = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [showNewStepForm, setShowNewStepForm] = useState(false);
-  const [connections, setConnections] = useState<Array<{ source: string; target: string }>>([]);
 
-  // Sincronizar flowSteps con React Flow
+  // Sincronizar flowSteps con React Flow usando el converter
   useEffect(() => {
-    const flowNodes: Node[] = flowSteps.map((step, index) => {
-      const colors: Record<string, string> = {
-        text: '#3b82f6',
-        email: '#8b5cf6',
-        phone: '#ec4899',
-        number: '#f59e0b',
-        select: '#10b981',
-      };
+    console.log('========================================');
+    console.log('🔄 CompanyFlowBuilder - Syncing flowSteps');
+    console.log('📊 flowSteps:', flowSteps);
+    console.log('========================================');
 
-      return {
-        id: step.stepId,
-        data: {
-          label: step.question,
-          type: step.type,
-          fieldName: step.fieldName,
-          isConditional: !!step.dependsOn,
-        },
-        position: { x: (index % 3) * 350, y: Math.floor(index / 3) * 200 },
-        type: 'step',
-        style: {
-          background: colors[step.type],
-          color: 'white',
-          border: selectedStepId === step.stepId ? '3px solid #000' : '2px solid #333',
-          borderRadius: '8px',
-          padding: '12px',
-          fontSize: '12px',
-          fontWeight: 'bold',
-          minWidth: '150px',
-          textAlign: 'center',
-          cursor: 'pointer',
-        },
-      };
+    if (!flowSteps || flowSteps.length === 0) {
+      setNodes([]);
+      setEdges([]);
+      return;
+    }
+
+    // Convertir formato BD a ReactFlow
+    const { steps, connections } = convertToReactFlowFormat(flowSteps);
+    
+    console.log('✅ Conversion complete:', {
+      steps: steps.length,
+      connections: connections.length,
     });
 
+    // Calcular posiciones con layout jerárquico
+    const positions = calculateHierarchicalLayout(steps, connections);
+
+    // Crear nodos de ReactFlow
+    const flowNodes: Node[] = steps.map((step) => ({
+      id: step.stepId,
+      data: {
+        label: step.question,
+        type: step.type,
+        fieldName: step.fieldName,
+        isConditional: !!step.dependsOn,
+        isSelected: selectedStepId === step.stepId,
+      },
+      position: positions[step.stepId] || { x: 0, y: 0 },
+      type: 'step',
+    }));
+
+    // Crear edges de ReactFlow
+    const flowEdges: Edge[] = connections.map((conn) => ({
+      id: conn.id,
+      source: conn.sourceStepId,
+      target: conn.targetStepId,
+      label: conn.label || conn.condition || '',
+      type: 'smoothstep',
+      animated: true,
+      style: { 
+        stroke: '#94a3b8', 
+        strokeWidth: 2 
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: '#94a3b8',
+        width: 20,
+        height: 20,
+      },
+      labelStyle: {
+        fontSize: 11,
+        fontWeight: 500,
+      },
+      labelBgStyle: {
+        fill: '#ffffff',
+      },
+    }));
+
+    console.log('🎨 ReactFlow elements created:');
+    console.log('  - Nodes:', flowNodes.length);
+    console.log('  - Edges:', flowEdges.length);
+    console.log('========================================');
+
     setNodes(flowNodes);
-  }, [flowSteps, selectedStepId, setNodes]);
+    setEdges(flowEdges);
+  }, [flowSteps, selectedStepId, setNodes, setEdges]);
 
   const handleNodeClick = (nodeId: string) => {
     setSelectedStepId(nodeId);
@@ -107,27 +145,15 @@ const CompanyFlowBuilder: React.FC<CompanyFlowBuilderProps> = ({
   const handleConnect = useCallback(
     (connection: Connection) => {
       if (connection.source && connection.target) {
-        const newConnection = { source: connection.source, target: connection.target };
-        const newConnections = [...connections, newConnection];
-        setConnections(newConnections);
+        console.log('🔗 New connection:', connection);
         
         // Notificar al padre sobre los cambios
         if (onConnectionsChange) {
-          onConnectionsChange(newConnections);
+          onConnectionsChange([{ source: connection.source, target: connection.target }]);
         }
-
-        // Agregar la arista visualmente
-        const newEdge: Edge = {
-          id: `edge-${connection.source}-${connection.target}`,
-          source: connection.source,
-          target: connection.target,
-          animated: true,
-          style: { stroke: '#3b82f6', strokeWidth: 2 },
-        };
-        setEdges((eds) => addEdge(newEdge, eds));
       }
     },
-    [connections, onConnectionsChange]
+    [onConnectionsChange]
   );
 
   const handleAddStep = (step: FlowStep) => {
@@ -155,7 +181,9 @@ const CompanyFlowBuilder: React.FC<CompanyFlowBuilderProps> = ({
       <div className="w-96 bg-gray-50 rounded-lg border border-gray-200 flex flex-col overflow-hidden">
         <div className="p-4 border-b border-gray-200 bg-white">
           <h3 className="font-bold text-lg text-gray-900">Pasos del Flujo</h3>
-          <p className="text-sm text-gray-600 mt-1">Total: {flowSteps.length} pasos</p>
+          <p className="text-sm text-gray-600 mt-1">
+            {flowSteps.length} pasos • {edges.length} conexiones
+          </p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -212,9 +240,8 @@ const CompanyFlowBuilder: React.FC<CompanyFlowBuilderProps> = ({
       {/* Right Panel - Canvas */}
       <div className="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col">
         {/* Instructions */}
-        <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 text-sm text-blue-800">
-          <p className="font-semibold mb-1">💡 Cómo conectar pasos:</p>
-          <p>Arrastra desde el punto inferior de un paso al punto superior de otro para crear una conexión.</p>
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 text-xs text-blue-800">
+          <p><span className="font-semibold">💡 Tip:</span> Los conectores se generan automáticamente desde los campos "dependsOn" y "showWhen"</p>
         </div>
 
         {/* Canvas */}
@@ -243,10 +270,27 @@ const CompanyFlowBuilder: React.FC<CompanyFlowBuilderProps> = ({
             onConnect={handleConnect}
             nodeTypes={nodeTypes}
             fitView
+            fitViewOptions={{ padding: 0.2 }}
+            minZoom={0.3}
+            maxZoom={2}
+            proOptions={{ hideAttribution: true }}
           >
-            <Background />
+            <Background color="#e5e7eb" gap={16} />
             <Controls />
-            <MiniMap />
+            <MiniMap 
+              nodeColor={(node) => {
+                const type = node.data.type as string;
+                const colors: Record<string, string> = {
+                  text: '#3b82f6',
+                  email: '#8b5cf6',
+                  phone: '#ec4899',
+                  number: '#f59e0b',
+                  select: '#10b981',
+                };
+                return colors[type] || '#6b7280';
+              }}
+              maskColor="rgba(0, 0, 0, 0.1)"
+            />
           </ReactFlow>
         )}
         </div>

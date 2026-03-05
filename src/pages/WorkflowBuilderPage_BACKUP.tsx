@@ -36,12 +36,134 @@ const STEP_TYPE_TEMPLATES: { type: StepType; icon: string; label: string; color:
   { type: 'select', icon: '📋', label: 'Selección', color: '#10b981' },
 ];
 
+// Auto-layout algorithm - Improved hierarchical layout with implicit connections
+const calculateNodePositions = (steps: FlowStep[], connections: WorkflowConnection[]) => {
+  if (steps.length === 0) return {};
+  
+  console.log('🎯 calculateNodePositions called with:', {
+    stepsCount: steps.length,
+    connectionsCount: connections.length,
+    connections: connections.map(c => `${c.sourceStepId} → ${c.targetStepId}`)
+  });
+  
+  const positions: Record<string, { x: number; y: number }> = {};
+  const levels: Record<string, number> = {};
+  const visited = new Set<string>();
+  
+  // Build adjacency lists from explicit connections AND implicit dependsOn
+  const outgoing: Record<string, string[]> = {};
+  const incoming: Record<string, string[]> = {};
+  
+  steps.forEach(s => {
+    outgoing[s.stepId] = [];
+    incoming[s.stepId] = [];
+  });
+  
+  // Add explicit connections
+  connections.forEach(c => {
+    if (outgoing[c.sourceStepId]) {
+      outgoing[c.sourceStepId].push(c.targetStepId);
+    }
+    if (incoming[c.targetStepId]) {
+      incoming[c.targetStepId].push(c.sourceStepId);
+    }
+  });
+  
+  // Add implicit connections from dependsOn field
+  steps.forEach(step => {
+    if (step.dependsOn) {
+      // Find the parent step by fieldName
+      const parentStep = steps.find(s => s.fieldName === step.dependsOn);
+      if (parentStep) {
+        if (!outgoing[parentStep.stepId].includes(step.stepId)) {
+          outgoing[parentStep.stepId].push(step.stepId);
+        }
+        if (!incoming[step.stepId].includes(parentStep.stepId)) {
+          incoming[step.stepId].push(parentStep.stepId);
+        }
+      }
+    }
+  });
+  
+  console.log('📊 Adjacency lists:', { outgoing, incoming });
+  
+  // Find root nodes (no incoming connections)
+  const roots = steps.filter(s => incoming[s.stepId].length === 0);
+  console.log('🌳 Root nodes:', roots.map(r => r.fieldName));
+  
+  // If no roots found, use first step
+  if (roots.length === 0 && steps.length > 0) {
+    roots.push(steps[0]);
+  }
+  
+  // BFS to assign levels
+  const queue: { stepId: string; level: number }[] = roots.map(s => ({ stepId: s.stepId, level: 0 }));
+  let maxLevel = 0;
+  
+  while (queue.length > 0) {
+    const { stepId, level } = queue.shift()!;
+    
+    // Skip if already visited with a lower or equal level
+    if (visited.has(stepId) && levels[stepId] <= level) continue;
+    
+    visited.add(stepId);
+    levels[stepId] = level;
+    maxLevel = Math.max(maxLevel, level);
+    
+    // Add children to queue
+    const children = outgoing[stepId] || [];
+    children.forEach(childId => {
+      queue.push({ stepId: childId, level: level + 1 });
+    });
+  }
+  
+  // Assign unvisited nodes (disconnected) to the end
+  steps.forEach(s => {
+    if (!visited.has(s.stepId)) {
+      levels[s.stepId] = maxLevel + 1;
+    }
+  });
+  
+  console.log('📏 Levels assigned:', levels);
+  
+  // Group by level
+  const levelGroups: Record<number, string[]> = {};
+  Object.entries(levels).forEach(([stepId, level]) => {
+    if (!levelGroups[level]) levelGroups[level] = [];
+    levelGroups[level].push(stepId);
+  });
+  
+  console.log('📦 Level groups:', levelGroups);
+  
+  // Calculate positions with better spacing
+  const NODE_WIDTH = 250;
+  const NODE_HEIGHT = 180;
+  const HORIZONTAL_SPACING = 100;
+  const VERTICAL_SPACING = 80;
+  
+  Object.entries(levelGroups).forEach(([level, stepIds]) => {
+    const levelNum = parseInt(level);
+    const y = levelNum * (NODE_HEIGHT + VERTICAL_SPACING);
+    
+    // Center nodes horizontally
+    const totalWidth = stepIds.length * NODE_WIDTH + (stepIds.length - 1) * HORIZONTAL_SPACING;
+    const startX = -totalWidth / 2 + NODE_WIDTH / 2;
+    
+    stepIds.forEach((stepId, index) => {
+      positions[stepId] = {
+        x: startX + index * (NODE_WIDTH + HORIZONTAL_SPACING),
+        y: y,
+      };
+    });
+  });
+  
+  return positions;
+};
+
 const WorkflowBuilderPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentWorkflow, fetchWorkflow, updateWorkflow, saveWorkflow, addStep, deleteStep, updateStep } = useWorkflowStore();
-  
-  console.log('🚀 WorkflowBuilderPage RENDER - id:', id, 'currentWorkflow:', currentWorkflow);
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -57,88 +179,89 @@ const WorkflowBuilderPage: React.FC = () => {
     }
   }, [id, fetchWorkflow]);
 
-  // Debug: verificar si currentWorkflow existe
+  // Sincronizar workflow con React Flow usando auto-layout
   useEffect(() => {
-    console.log('🔍 DEBUG - currentWorkflow:', currentWorkflow);
-    console.log('🔍 DEBUG - flujoBot length:', currentWorkflow?.flujoBot?.length);
-  }, [currentWorkflow]);
-
-  // Sincronizar workflow con React Flow
-  useEffect(() => {
-    console.log('========================================');
-    console.log('🔄 USEEFFECT TRIGGERED');
-    console.log('currentWorkflow:', currentWorkflow);
-    console.log('========================================');
-    
     if (currentWorkflow) {
-      console.log('🔄 Converting workflow to ReactFlow format...');
-      console.log('📊 Original flujoBot:', currentWorkflow.flujoBot);
+      console.log('🔍 DEBUG: Workflow flujoBot:', currentWorkflow.flujoBot);
       
-      // Convertir formato BD a ReactFlow
-      const { steps, connections } = convertToReactFlowFormat(currentWorkflow.flujoBot);
-      
-      console.log('✅ Conversion complete:', {
-        steps: steps.length,
-        connections: connections.length,
-        stepsData: steps.map(s => ({ stepId: s.stepId, fieldName: s.fieldName, dependsOn: s.dependsOn })),
-        connectionsData: connections,
+      // FIX: Ensure unique stepIds (some workflows have duplicates)
+      const stepsWithUniqueIds = currentWorkflow.flujoBot.map((step, index) => {
+        const existingIds = currentWorkflow.flujoBot
+          .slice(0, index)
+          .map(s => s.stepId);
+        
+        if (existingIds.includes(step.stepId)) {
+          const newStepId = `${step.stepId}-${step.fieldName}`;
+          console.warn(`⚠️ Duplicate stepId found: ${step.stepId}, changing to: ${newStepId}`);
+          return { ...step, stepId: newStepId };
+        }
+        return step;
       });
       
-      // Calcular posiciones con layout jerárquico
-      const positions = calculateHierarchicalLayout(steps, connections);
+      // Generate implicit connections from dependsOn fields
+      const implicitConnections: WorkflowConnection[] = [];
+      stepsWithUniqueIds.forEach(step => {
+        if (step.dependsOn) {
+          const parentStep = stepsWithUniqueIds.find(s => s.fieldName === step.dependsOn);
+          if (parentStep) {
+            const connection = {
+              id: `implicit-${parentStep.stepId}-${step.stepId}`,
+              sourceStepId: parentStep.stepId,
+              targetStepId: step.stepId,
+              label: step.showWhen ? `"${step.showWhen}"` : '',
+            };
+            implicitConnections.push(connection);
+            console.log(`🔗 Connection: ${parentStep.fieldName} → ${step.fieldName} (${step.showWhen})`);
+          } else {
+            console.warn(`⚠️ Parent not found for ${step.fieldName}, dependsOn: ${step.dependsOn}`);
+          }
+        }
+      });
       
+      console.log('📊 Total implicit connections:', implicitConnections.length);
+      
+      // Combine explicit and implicit connections
+      const allConnections = [
+        ...(currentWorkflow.connections || []),
+        ...implicitConnections,
+      ];
+      
+      const positions = calculateNodePositions(stepsWithUniqueIds, allConnections);
       console.log('📍 Calculated positions:', positions);
       
-      // Crear nodos de ReactFlow
-      const flowNodes: Node[] = steps.map((step) => ({
-        id: step.stepId,
-        data: {
-          label: step.question,
-          type: step.type,
-          fieldName: step.fieldName,
-          isConditional: !!step.dependsOn,
-          isSelected: selectedStepId === step.stepId,
-        },
-        position: positions[step.stepId] || { x: 0, y: 0 },
-        type: 'step',
-      }));
+      const flowNodes: Node[] = stepsWithUniqueIds.map((step) => {
+        return {
+          id: step.stepId,
+          data: {
+            label: step.question,
+            type: step.type,
+            fieldName: step.fieldName,
+            isConditional: !!step.dependsOn,
+            isSelected: selectedStepId === step.stepId,
+          },
+          position: positions[step.stepId] || { x: 0, y: 0 },
+          type: 'step',
+        };
+      });
 
-      // Crear edges de ReactFlow
-      const flowEdges: Edge[] = connections.map((conn) => ({
+      const flowEdges: Edge[] = allConnections.map((conn) => ({
         id: conn.id,
         source: conn.sourceStepId,
         target: conn.targetStepId,
-        label: conn.label || conn.condition || '',
-        type: 'smoothstep',
+        label: conn.label,
         animated: true,
-        style: { 
-          stroke: '#94a3b8', 
-          strokeWidth: 2 
-        },
+        style: { stroke: '#94a3b8', strokeWidth: 2 },
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: '#94a3b8',
-          width: 20,
-          height: 20,
-        },
-        labelStyle: {
-          fontSize: 11,
-          fontWeight: 500,
-        },
-        labelBgStyle: {
-          fill: '#ffffff',
         },
       }));
 
-      console.log('🎨 ReactFlow elements created:');
-      console.log('  - Nodes:', flowNodes.map(n => ({ id: n.id, position: n.position })));
-      console.log('  - Edges:', flowEdges.map(e => ({ id: e.id, source: e.source, target: e.target, label: e.label })));
-      console.log('========================================');
+      console.log('🎨 Flow nodes:', flowNodes.length);
+      console.log('🔗 Flow edges:', flowEdges.length);
 
       setNodes(flowNodes);
       setEdges(flowEdges);
-    } else {
-      console.log('⚠️ currentWorkflow is null/undefined');
     }
   }, [currentWorkflow, selectedStepId, setNodes, setEdges]);
 
@@ -493,11 +616,9 @@ const WorkflowBuilderPage: React.FC = () => {
             onConnect={handleConnect}
             nodeTypes={nodeTypes}
             fitView
-            fitViewOptions={{ padding: 0.2 }}
-            minZoom={0.3}
-            maxZoom={2}
-            defaultViewport={{ x: 0, y: 0, zoom: 0.7 }}
-            proOptions={{ hideAttribution: true }}
+            minZoom={0.5}
+            maxZoom={1.5}
+            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
           >
             <Background color="#e5e7eb" gap={16} />
             <Controls />

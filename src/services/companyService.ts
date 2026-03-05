@@ -43,7 +43,7 @@ const logApiCall = (method: string, endpoint: string, data?: any) => {
 
 const logApiResponse = (method: string, endpoint: string, response: any) => {
   console.log(`%c[API RESPONSE] ${method} ${endpoint}`, 'color: #00aa00; font-weight: bold;');
-  console.log('%cResponse:', 'color: #666; font-weight: bold;', JSON.stringify(response, null, 2));
+  //console.log('%cResponse:', 'color: #666; font-weight: bold;', JSON.stringify(response, null, 2));
 };
 
 export const companyService = {

@@ -17,7 +17,7 @@ const STEP_TYPES: { value: StepType; label: string; icon: string }[] = [
 ];
 
 const StepEditor: React.FC<StepEditorProps> = ({ step, onSave, onCancel, stepCount = 0 }) => {
-  const [stepId, setStepId] = useState(step?.stepId || `step-${Date.now()}`);
+  const [stepId, setStepId] = useState(step?.stepId || `step-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const [fieldName, setFieldName] = useState(step?.fieldName || '');
   const [question, setQuestion] = useState(step?.question || '');
   const [type, setType] = useState<StepType>(step?.type || 'text');
