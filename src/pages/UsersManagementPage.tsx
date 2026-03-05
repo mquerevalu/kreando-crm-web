@@ -95,9 +95,13 @@ const UsersManagementPage: React.FC = () => {
     }
     
     try {
+      // Normalizar email y userId a minúsculas (Cognito guarda en minúsculas)
+      const normalizedEmail = formData.email.toLowerCase().trim();
+      const normalizedUserId = formData.userId.toLowerCase().trim();
+      
       await userService.createOrUpdateUser(
-        formData.userId,
-        formData.email,
+        normalizedUserId,
+        normalizedEmail,
         formData.name,
         formData.role,
         formData.password
@@ -127,9 +131,10 @@ const UsersManagementPage: React.FC = () => {
     if (!selectedUser) return;
     
     try {
+      // Normalizar email a minúsculas
       const updates: any = {
         name: editFormData.name,
-        email: editFormData.email,
+        email: editFormData.email.toLowerCase().trim(),
         role: editFormData.role,
       };
       

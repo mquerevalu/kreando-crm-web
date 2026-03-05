@@ -242,7 +242,7 @@ const ConversationsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedCompany]);
+  }, [selectedCompany, user, canAccessConversation]);
 
   // Scroll infinito para cargar más conversaciones con debounce
   const handleConversationsScroll = useCallback(() => {
@@ -359,17 +359,31 @@ const ConversationsPage: React.FC = () => {
           return bTime - aTime;
         });
         
-        // Si la conversación no existe en la lista, recargar todas las conversaciones
+        // Si la conversación no existe en la lista, verificar si el usuario tiene acceso antes de recargar
         const conversationExists = updated.some(conv => conv.senderId === wsMessage.senderId);
         if (!conversationExists) {
-          console.log(`New conversation detected for senderId: ${wsMessage.senderId}, reloading conversations`);
-          loadConversations();
+          console.log(`New conversation detected for senderId: ${wsMessage.senderId}`);
+          
+          // Si es asesor, verificar si tiene acceso a esta conversación
+          if (user?.role === 'asesor') {
+            const hasAccess = canAccessConversation(wsMessage.pageId || pageId, wsMessage.senderId);
+            if (hasAccess) {
+              console.log('✅ Asesor tiene acceso, recargando conversaciones');
+              loadConversations();
+            } else {
+              console.log('❌ Asesor NO tiene acceso, ignorando conversación nueva');
+            }
+          } else {
+            // Administradores y operadores siempre recargan
+            console.log('✅ Recargando conversaciones para admin/operador');
+            loadConversations();
+          }
         }
         
         return sortedConversations;
       });
     }
-  }, [loadConversations]);
+  }, [loadConversations, user, canAccessConversation, pageId]);
 
   // Conectar WebSocket con el senderId de la conversación seleccionada
   useWebSocket(pageId, selectedConversation?.senderId, handleWebSocketMessage);
@@ -462,7 +476,16 @@ const ConversationsPage: React.FC = () => {
       if (selectedCompany?.phoneNumberId) {
         const pageId = `whatsapp-${selectedCompany.phoneNumberId}`;
         const result = await conversationService.getConversations(pageId);
-        setConversations(result.conversations);
+        
+        // Aplicar el mismo filtro que en loadConversations
+        let filteredConversations = result.conversations;
+        if (user?.role === 'asesor') {
+          filteredConversations = result.conversations.filter(conv => 
+            canAccessConversation(conv.pageId, conv.senderId)
+          );
+        }
+        
+        setConversations(filteredConversations);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -530,7 +553,16 @@ const ConversationsPage: React.FC = () => {
       if (selectedCompany?.phoneNumberId) {
         const pageId = `whatsapp-${selectedCompany.phoneNumberId}`;
         const result = await conversationService.getConversations(pageId);
-        setConversations(result.conversations);
+        
+        // Aplicar el mismo filtro que en loadConversations
+        let filteredConversations = result.conversations;
+        if (user?.role === 'asesor') {
+          filteredConversations = result.conversations.filter(conv => 
+            canAccessConversation(conv.pageId, conv.senderId)
+          );
+        }
+        
+        setConversations(filteredConversations);
       }
     } catch (error) {
       console.error('Error sending file:', error);
