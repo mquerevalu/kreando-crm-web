@@ -56,7 +56,7 @@ const ConversationBoardPage: React.FC = () => {
   const [filterUnread, setFilterUnread] = useState(false);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
-  const [datePreset, setDatePreset] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('month');
+  const [datePreset, setDatePreset] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('today');
   const [dateField, setDateField] = useState<'createdAt' | 'updatedAt'>('updatedAt');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedConversation, setDraggedConversation] = useState<Conversation | null>(null);
@@ -132,11 +132,12 @@ const ConversationBoardPage: React.FC = () => {
   }, [selectedCompany]);
 
   // Recargar conversaciones cuando cambien los filtros de fecha
-  useEffect(() => {
-    if (selectedCompany) {
-      loadConversations();
-    }
-  }, [datePreset, startDate, endDate, dateField]);
+  // REMOVIDO: Ya no se recarga automáticamente, solo con el botón Buscar
+  // useEffect(() => {
+  //   if (selectedCompany) {
+  //     loadConversations();
+  //   }
+  // }, [datePreset, startDate, endDate, dateField]);
 
   const loadStatuses = async () => {
     if (!selectedCompany) return;
@@ -159,26 +160,68 @@ const ConversationBoardPage: React.FC = () => {
       let endTimestamp: number | undefined;
       
       if (datePreset === 'custom' && startDate && endDate) {
-        startTimestamp = new Date(startDate).setHours(0, 0, 0, 0);
-        endTimestamp = new Date(endDate).setHours(23, 59, 59, 999);
+        // Debug: ver qué valores tienen startDate y endDate
+        console.log('🔍 DEBUG - Raw date values:', { startDate, endDate });
+        
+        // Para fechas personalizadas, parsear la fecha en zona horaria local
+        // El input type="date" devuelve formato YYYY-MM-DD
+        // Necesitamos parsearlo como fecha local, no UTC
+        const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+        const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+        
+        console.log('🔍 DEBUG - Parsed values:', { 
+          start: { year: startYear, month: startMonth, day: startDay },
+          end: { year: endYear, month: endMonth, day: endDay }
+        });
+        
+        const startDateObj = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
+        const endDateObj = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
+        
+        console.log('🔍 DEBUG - Date objects:', { 
+          startDateObj: startDateObj.toString(), 
+          endDateObj: endDateObj.toString(),
+          startTimestamp: startDateObj.getTime(),
+          endTimestamp: endDateObj.getTime(),
+          startDateReadable: new Date(startDateObj.getTime()).toLocaleString('es-PE', { timeZone: 'America/Lima' }),
+          endDateReadable: new Date(endDateObj.getTime()).toLocaleString('es-PE', { timeZone: 'America/Lima' })
+        });
+        
+        startTimestamp = startDateObj.getTime();
+        endTimestamp = endDateObj.getTime();
       } else if (datePreset !== 'all') {
         const now = Date.now();
         endTimestamp = now;
         
         switch (datePreset) {
           case 'today':
-            startTimestamp = new Date().setHours(0, 0, 0, 0);
+            // Inicio del día de hoy en la zona horaria local
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+            startTimestamp = todayStart.getTime();
             break;
           case 'week':
+            // Hace 7 días exactos
             startTimestamp = now - (7 * 24 * 60 * 60 * 1000);
             break;
           case 'month':
+            // Hace 30 días exactos
             startTimestamp = now - (30 * 24 * 60 * 60 * 1000);
             break;
         }
       }
       
-      console.log('📅 Date filter:', { datePreset, dateField, startTimestamp, endTimestamp, startDate, endDate });
+      console.log('📅 Date filter:', { 
+        datePreset, 
+        dateField, 
+        startTimestamp, 
+        endTimestamp, 
+        startDate, 
+        endDate,
+        startDateReadable: startTimestamp ? new Date(startTimestamp).toLocaleString('es-PE', { timeZone: 'America/Lima' }) : 'N/A',
+        endDateReadable: endTimestamp ? new Date(endTimestamp).toLocaleString('es-PE', { timeZone: 'America/Lima' }) : 'N/A',
+        startDateUTC: startTimestamp ? new Date(startTimestamp).toISOString() : 'N/A',
+        endDateUTC: endTimestamp ? new Date(endTimestamp).toISOString() : 'N/A'
+      });
       
       const result = await conversationService.getConversations(
         pageId, 
@@ -191,6 +234,14 @@ const ConversationBoardPage: React.FC = () => {
       
       console.log('📥 Loaded conversations:', result.conversations.length);
       console.log('👤 Rol del usuario:', user?.role);
+      
+      // Log de las primeras 5 conversaciones para debugging
+      if (result.conversations.length > 0) {
+        console.log('📋 Sample conversations (first 5):');
+        result.conversations.slice(0, 5).forEach((conv: any) => {
+          console.log(`  - ${conv.phoneNumber}: updatedAt=${conv.updatedAt} (${new Date(conv.updatedAt).toLocaleString('es-PE', { timeZone: 'America/Lima' })}) createdAt=${conv.createdAt} (${new Date(conv.createdAt).toLocaleString('es-PE', { timeZone: 'America/Lima' })})`);
+        });
+      }
       
       // Filtrar conversaciones según permisos del usuario (igual que en ConversationsPage)
       let filteredConversations = result.conversations;
@@ -764,10 +815,14 @@ const ConversationBoardPage: React.FC = () => {
             </div>
 
             <div className="flex gap-2 items-center">
-              {/* Indicador de filtro por última actividad */}
-              <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm font-medium">
-                📅 Última actividad
-              </div>
+              {/* Selector de campo de fecha */}
+              <select
+                value={dateField}
+                onChange={(e) => setDateField(e.target.value as 'createdAt' | 'updatedAt')}
+                className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="updatedAt">📅 Última actividad</option>
+              </select>
               
               <select
                 value={datePreset}
@@ -775,13 +830,20 @@ const ConversationBoardPage: React.FC = () => {
                   const value = e.target.value as any;
                   setDatePreset(value);
                   if (value === 'custom') {
-                    // Establecer fechas por defecto: último mes
+                    // Establecer fecha de hoy en ambos campos por defecto
                     const today = new Date();
-                    const oneMonthAgo = new Date();
-                    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
                     
-                    setEndDate(today.toISOString().split('T')[0]);
-                    setStartDate(oneMonthAgo.toISOString().split('T')[0]);
+                    // Formatear fechas en formato YYYY-MM-DD en zona horaria local
+                    const formatLocalDate = (date: Date) => {
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      const day = String(date.getDate()).padStart(2, '0');
+                      return `${year}-${month}-${day}`;
+                    };
+                    
+                    const todayFormatted = formatLocalDate(today);
+                    setStartDate(todayFormatted);
+                    setEndDate(todayFormatted);
                   } else {
                     setStartDate('');
                     setEndDate('');
@@ -815,6 +877,27 @@ const ConversationBoardPage: React.FC = () => {
                   />
                 </>
               )}
+              
+              {/* Botón Buscar */}
+              <button
+                onClick={() => loadConversations()}
+                disabled={loading}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Buscando...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Buscar
+                  </>
+                )}
+              </button>
             </div>
             
             <button
@@ -831,12 +914,12 @@ const ConversationBoardPage: React.FC = () => {
               No leídos
             </button>
 
-            {(searchTerm || filterUnread || datePreset !== 'month' || dateField !== 'updatedAt') && (
+            {(searchTerm || filterUnread || datePreset !== 'today' || dateField !== 'updatedAt') && (
               <button
                 onClick={() => {
                   setSearchTerm('');
                   setFilterUnread(false);
-                  setDatePreset('month');
+                  setDatePreset('today');
                   setDateField('updatedAt');
                   setStartDate('');
                   setEndDate('');
